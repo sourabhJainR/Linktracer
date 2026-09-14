@@ -22,12 +22,15 @@
       <textarea id="description" rows="3" placeholder="Description or why you saved it"></textarea>
       <div class="row"><input id="tags" type="text" placeholder="Tags, comma separated"><button type="submit">Save link</button></div>
     </form>
-    <p id="enrichment" class="hint">Context and suggested tags are added when the laptop is reachable.</p>
+    <p id="enrichment" class="hint">Context, classification and suggested tags are added when connected.</p>
   </section>
   <section class="toolbar">
-    <input id="search" type="search" placeholder="Search links, tags and descriptions">
+    <div class="searchBox"><input id="search" type="search" placeholder="Search, or use tag:ai type:article domain:github.com health:broken duplicate:true"><button id="clearSearch" type="button">Clear</button></div>
+    <select id="typeFilter" aria-label="Content type"><option value="">All types</option><option>article</option><option>code</option><option>documentation</option><option>paper</option><option>video</option><option>social</option><option>product</option><option>webpage</option></select>
+    <select id="healthFilter" aria-label="Link health"><option value="">All health</option><option value="healthy">Healthy</option><option value="broken">Broken</option><option value="unchecked">Unchecked</option></select>
     <span id="count"></span>
   </section>
+  <section id="summary" class="summary"></section>
   <section id="links" class="grid"></section>
 </main>
 <script src="/app.js" type="module"></script>
