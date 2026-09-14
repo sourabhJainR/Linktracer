@@ -10,41 +10,16 @@
   <title>Linktracer</title>
 </head>
 <body>
-<header class="topbar">
-  <div><h1>Linktracer</h1><span id="status">Starting...</span></div>
-  <div class="actions"><button id="syncBtn">Sync</button><button id="exportBtn" type="button">Export</button><button id="importBtn" type="button">Import</button><input id="importFile" type="file" accept="application/json" hidden></div>
-</header>
+<header class="topbar"><div><h1>Linktracer</h1><span id="status">Starting...</span></div><div class="actions"><button id="syncBtn">Sync</button><button id="exportBtn" type="button">Export</button><button id="importBtn" type="button">Import</button><input id="importFile" type="file" accept="application/json" hidden></div></header>
 <main>
-  <section class="capture card">
-    <form id="captureForm">
-      <input id="url" type="url" placeholder="Paste a link" required autocomplete="url">
-      <input id="title" type="text" placeholder="Title (optional)">
-      <textarea id="description" rows="3" placeholder="Description or why you saved it"></textarea>
-      <div class="row"><input id="tags" type="text" placeholder="Tags, comma separated"><button type="submit">Save link</button></div>
-    </form>
-    <p id="enrichment" class="hint">Context, classification and suggested tags are added when connected.</p>
-  </section>
-
-  <section class="workspace card">
-    <div class="workspaceTitle"><strong>Smart collections</strong><button id="deleteCollection" type="button" class="subtle">Delete selected</button></div>
-    <div id="collections" class="collections"></div>
-  </section>
-
-  <section class="toolbar">
-    <div class="searchBox"><input id="search" type="search" placeholder="Search, or use tag:ai type:article domain:github.com health:broken duplicate:true"><button id="clearSearch" type="button">Clear</button></div>
-    <select id="typeFilter" aria-label="Content type"><option value="">All types</option><option>article</option><option>code</option><option>documentation</option><option>paper</option><option>video</option><option>social</option><option>product</option><option>webpage</option></select>
-    <select id="healthFilter" aria-label="Link health"><option value="">All health</option><option value="healthy">Healthy</option><option value="broken">Broken</option><option value="unchecked">Unchecked</option></select>
-    <span id="count"></span>
-  </section>
-  <section id="summary" class="summary"></section>
-  <section id="links" class="grid"></section>
+<section class="capture card"><form id="captureForm"><input id="url" type="url" placeholder="Paste a link" required autocomplete="url"><input id="title" type="text" placeholder="Title (optional)"><textarea id="description" rows="3" placeholder="Description or why you saved it"></textarea><div class="row"><input id="tags" type="text" placeholder="Tags, comma separated"><button type="submit">Save link</button></div></form><p id="enrichment" class="hint">Context, classification and suggested tags are added when connected.</p></section>
+<section class="workspace card"><div class="workspaceTitle"><strong>Smart collections</strong><button id="deleteCollection" type="button" class="subtle">Delete selected</button></div><div id="collections" class="collections"></div></section>
+<section class="workspace card knowledgeRadarCard"><div class="workspaceTitle"><strong>Knowledge Radar</strong><span class="hint">Local signals, rediscovery and evidence</span></div><div id="knowledgeRadar"></div></section>
+<section class="workspace card evidenceGraphCard"><div class="workspaceTitle"><strong>Personal Evidence Graph</strong><span class="hint">Claims, topics and source relationships</span></div><div id="knowledgeGraph"></div></section>
+<section class="toolbar"><div class="searchBox"><input id="search" type="search" placeholder="Search, or use tag:ai type:article domain:github.com health:broken duplicate:true"><button id="clearSearch" type="button">Clear</button></div><select id="typeFilter" aria-label="Content type"><option value="">All types</option><option>article</option><option>code</option><option>documentation</option><option>paper</option><option>video</option><option>social</option><option>product</option><option>webpage</option></select><select id="healthFilter" aria-label="Link health"><option value="">All health</option><option value="healthy">Healthy</option><option value="broken">Broken</option><option value="unchecked">Unchecked</option></select><span id="count"></span></section>
+<section id="summary" class="summary"></section><section id="links" class="grid"></section>
 </main>
-
-<dialog id="readerDialog" class="readerDialog">
-  <div class="readerHeader"><div><h2 id="readerTitle">Reader</h2><div id="readerMeta" class="readerMeta"></div></div><button id="readerClose" type="button" class="subtle">Close</button></div>
-  <article id="readerBody" class="readerBody"></article>
-  <footer class="readerFooter"><button id="readerHighlight" type="button">Save selected text as highlight</button><a id="readerOpenLink" href="#" target="_blank" rel="noreferrer" data-url="">Open source</a></footer>
-</dialog>
-<script src="/app.js" type="module"></script>
+<dialog id="readerDialog" class="readerDialog"><div class="readerHeader"><div><h2 id="readerTitle">Reader</h2><div id="readerMeta" class="readerMeta"></div></div><button id="readerClose" type="button" class="subtle">Close</button></div><article id="readerBody" class="readerBody"></article><footer class="readerFooter"><button id="readerHighlight" type="button">Save selected text as highlight</button><a id="readerOpenLink" href="#" target="_blank" rel="noreferrer" data-url="">Open source</a></footer></dialog>
+<script src="/app.js" type="module"></script><script src="/moat.js"></script>
 </body>
 </html>
