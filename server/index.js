@@ -26,6 +26,13 @@ CREATE TABLE IF NOT EXISTS links (
   revision INTEGER NOT NULL DEFAULT 1
 );
 CREATE INDEX IF NOT EXISTS idx_links_updated ON links(updated_at);
+CREATE TABLE IF NOT EXISTS change_log (
+  seq INTEGER PRIMARY KEY AUTOINCREMENT,
+  canonical_url TEXT NOT NULL,
+  revision INTEGER NOT NULL,
+  changed_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_change_log_seq ON change_log(seq);
 `);
 
 const app = express();
@@ -63,10 +70,16 @@ async function enrich(url) {
 }
 function parseDescriptions(value) { try { return Array.isArray(value) ? value : JSON.parse(value || '[]'); } catch { return []; } }
 function parseTags(value) { try { return [...new Set((Array.isArray(value) ? value : JSON.parse(value || '[]')).map(String).map(s => s.trim().toLowerCase()).filter(Boolean))]; } catch { return []; } }
-function mergedDescription(items) {
+function mergedDescriptions(items) {
   const seen = new Set();
-  return items.filter(x => x?.text?.trim()).filter(x => { const k = x.text.trim().toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true; }).map(x => x.text.trim()).join('\n\n');
+  return items.filter(x => x?.text?.trim()).filter(x => {
+    const k = x.text.trim().toLowerCase();
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  }).map(x => ({ text: x.text.trim(), deviceId: x.deviceId || 'unknown', updatedAt: Number(x.updatedAt || 0) }));
 }
+function mergedDescription(items) { return mergedDescriptions(items).map(x => x.text).join('\n\n'); }
 function rowToLink(row) {
   const descriptions = parseDescriptions(row.descriptions);
   return { id: row.id, url: row.url, canonicalUrl: row.canonical_url, title: row.title, description: mergedDescription(descriptions), descriptions, tags: parseTags(row.tags), sourceContext: JSON.parse(row.source_context || '{}'), createdAt: row.created_at, updatedAt: row.updated_at, revision: row.revision };
@@ -74,41 +87,70 @@ function rowToLink(row) {
 const get = db.prepare('SELECT * FROM links WHERE canonical_url = ?');
 const insert = db.prepare('INSERT INTO links (id,canonical_url,url,title,descriptions,tags,source_context,created_at,updated_at,revision) VALUES (?,?,?,?,?,?,?,?,?,?)');
 const update = db.prepare('UPDATE links SET url=?,title=?,descriptions=?,tags=?,source_context=?,updated_at=?,revision=revision+1 WHERE canonical_url=?');
+const logChange = db.prepare('INSERT INTO change_log (canonical_url,revision,changed_at) VALUES (?,?,?)');
+
 function mergeLink(input, existing, now) {
   const canonicalUrl = canonicalize(input.url || input.canonicalUrl);
   const descriptions = existing ? parseDescriptions(existing.descriptions) : [];
-  const incoming = Array.isArray(input.descriptions) && input.descriptions.length ? input.descriptions : (input.description ? [{ text: input.description, deviceId: input.deviceId || 'unknown', updatedAt: now }] : []);
-  const mergedDescriptions = [...descriptions, ...incoming].filter(x => x?.text?.trim());
+  const incoming = Array.isArray(input.descriptions) && input.descriptions.length
+    ? input.descriptions
+    : (input.description ? [{ text: input.description, deviceId: input.deviceId || 'unknown', updatedAt: now }] : []);
+  const merged = mergedDescriptions([...descriptions, ...incoming]);
   const tags = [...new Set([...(existing ? parseTags(existing.tags) : []), ...parseTags(input.tags || [])])];
   const context = { ...(existing ? JSON.parse(existing.source_context || '{}') : {}), ...(input.sourceContext || {}) };
   const title = input.title?.trim() || existing?.title || '';
   const url = input.url?.trim() || existing?.url || canonicalUrl;
   if (!existing) {
     const id = input.id || randomUUID();
-    insert.run(id, canonicalUrl, url, title, JSON.stringify(mergedDescriptions), JSON.stringify(tags), JSON.stringify(context), now, now, 1);
+    insert.run(id, canonicalUrl, url, title, JSON.stringify(merged), JSON.stringify(tags), JSON.stringify(context), now, now, 1);
+    logChange.run(canonicalUrl, 1, now);
     return rowToLink(get.get(canonicalUrl));
   }
-  update.run(url, title, JSON.stringify(mergedDescriptions), JSON.stringify(tags), JSON.stringify(context), now, canonicalUrl);
-  return rowToLink(get.get(canonicalUrl));
+  update.run(url, title, JSON.stringify(merged), JSON.stringify(tags), JSON.stringify(context), now, canonicalUrl);
+  const updated = get.get(canonicalUrl);
+  logChange.run(canonicalUrl, updated.revision, now);
+  return rowToLink(updated);
 }
+
 app.get('/api/links', (req, res) => {
-  const since = Number(req.query.since || 0);
-  const rows = db.prepare('SELECT * FROM links WHERE updated_at > ? ORDER BY updated_at DESC').all(Number.isFinite(since) ? since : 0);
-  res.json({ links: rows.map(rowToLink), serverTime: Date.now() });
+  const cursor = Number(req.query.cursor || 0);
+  const safeCursor = Number.isFinite(cursor) && cursor >= 0 ? cursor : 0;
+  const changes = db.prepare('SELECT seq, canonical_url FROM change_log WHERE seq > ? ORDER BY seq ASC LIMIT 500').all(safeCursor);
+  const uniqueUrls = [...new Set(changes.map(x => x.canonical_url))];
+  const rows = uniqueUrls.map(url => get.get(url)).filter(Boolean);
+  const nextCursor = changes.length ? changes[changes.length - 1].seq : safeCursor;
+  res.json({ links: rows.map(rowToLink), serverTime: Date.now(), cursor: nextCursor, hasMore: changes.length === 500 });
 });
+
+const syncBatch = db.transaction((changes) => {
+  const merged = [];
+  const acceptedChangeIds = [];
+  const rejectedChanges = [];
+  for (const change of changes) {
+    const changeId = String(change?.changeId || '');
+    try {
+      if (!changeId) throw new Error('missing changeId');
+      const canonical = canonicalize(change.url || change.canonicalUrl || '');
+      merged.push(mergeLink(change, get.get(canonical), Date.now()));
+      acceptedChangeIds.push(changeId);
+    } catch (error) {
+      rejectedChanges.push({ changeId, error: error.message || 'invalid change' });
+    }
+  }
+  return { merged, acceptedChangeIds, rejectedChanges };
+});
+
 app.post('/api/sync', (req, res) => {
   const changes = Array.isArray(req.body?.changes) ? req.body.changes : [];
-  const merged = [];
-  for (const change of changes) {
-    try { merged.push(mergeLink(change, get.get(canonicalize(change.url || change.canonicalUrl)), Date.now())); } catch { /* keep other records syncable */ }
-  }
-  res.json({ links: merged, serverTime: Date.now() });
+  const result = syncBatch(changes);
+  res.json({ ...result, links: result.merged, serverTime: Date.now() });
 });
+
 app.post('/api/enrich', async (req, res) => {
   try {
     const url = canonicalize(req.body?.url || '');
     const context = await enrich(url);
-    res.json({ url, ...context, tags: autoTags(`${url} ${context.title} ${context.description}`) });
+    res.json({ url, ...context, tags: autoTags(`${url} ${context.title} ${context.description}`), enrichedAt: Date.now() });
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
 app.get('/api/health', (_req, res) => res.json({ ok: true, time: Date.now() }));
