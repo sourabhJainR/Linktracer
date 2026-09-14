@@ -1,5 +1,5 @@
-const CACHE='linktracer-v5';
-const APP=['/','/index.html','/styles.css?v=20260914-2','/app.js?v=20260914-2','/io.js?v=20260914-2','/whatsapp.js','/manifest.webmanifest'];
+const CACHE='linktracer-v6';
+const APP=['/','/index.html','/styles.css?v=20260914-3','/app.js?v=20260914-3','/io.js?v=20260914-3','/whatsapp.js','/manifest.webmanifest'];
 self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(APP)).then(()=>self.skipWaiting())));
 self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
 self.addEventListener('fetch',e=>{
