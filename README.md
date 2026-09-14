@@ -12,15 +12,32 @@ Linktracer is an offline-first personal link library designed to run on a laptop
 - Merge the same link captured or edited on different devices instead of overwriting data.
 - Union tags across devices.
 - Preserve distinct descriptions from different devices and de-duplicate identical descriptions.
-- Extract page title, description and hostname when the laptop can reach the source URL.
+- Extract page title, description, hostname, final URL and readable source context when the laptop can reach the source URL.
+- Classify captured pages into useful deterministic types such as article, code, documentation, paper, video, social, product or webpage.
 - Generate deterministic suggested tags locally and on the server.
 - Retry source enrichment after reconnect for links saved while offline.
+- Search locally with free-text terms plus smart filters such as `tag:ai`, `type:article`, `domain:github.com`, `health:broken`, `duplicate:true`, `before:2026-09-01` and `after:2026-08-01`.
+- Detect likely duplicates using normalized title and hostname in addition to exact canonical URL de-duplication.
+- Check link health on demand and record HTTP status, final URL, response time and last-check time.
+- Show library health counts for total links, possible duplicates, broken/unreachable links and unchecked links.
 - Use a monotonic server change cursor instead of wall-clock timestamps, avoiding missed updates when devices have clock skew or multiple changes share a timestamp.
 - Acknowledge individual outbox operations; rejected operations remain queued instead of being silently discarded.
 - Trigger background sync where the browser supports the Background Sync API.
 - Export and import a portable JSON backup directly from the browser.
 - Install as a PWA on a phone or desktop.
 - No external cloud database is required.
+
+## Stage 1 search and intelligence
+
+The application remains local-first: filtering and duplicate detection work against the IndexedDB copy even when the server is unavailable. Search syntax is intentionally simple:
+
+```text
+architecture tag:ai type:article
+ domain:github.com health:healthy
+ duplicate:true after:2026-08-01
+```
+
+The content classifier is deterministic and dependency-free. It uses URL/domain, title and extracted text signals, so classification does not require an AI provider. Link health checks are explicit user actions rather than a background crawler, keeping LAN traffic and external requests predictable.
 
 ## Design ideas adopted from open-source projects
 
@@ -30,7 +47,7 @@ Linktracer intentionally stays small, but its architecture follows proven patter
 - **Stable operation IDs and deterministic convergence:** every queued mutation has a client-generated `changeId`; the server acknowledges individual operations and merges fields instead of treating a device as the source of truth.
 - **Monotonic sync cursor:** server changes are tracked with a SQLite sequence so synchronization does not depend on client clocks.
 - **Automatic metadata extraction and tagging:** inspired by Karakeep/Hoarder's automatic title, description and AI-tagging workflow, Linktracer enriches saved URLs without making enrichment a prerequisite for saving.
-- **Preservation mindset:** inspired by Linkwarden's focus on link rot and content preservation, the next natural extension is optional page snapshots/readable copies. The current release deliberately keeps the core storage lightweight.
+- **Preservation and library health:** inspired by Linkwarden and other bookmark managers, Linktracer now detects likely duplicates and checks link health while keeping the core storage lightweight.
 
 References: [Karakeep/Hoarder](https://github.com/karakeep/hoarder), [Linkwarden](https://github.com/linkwarden/linkwarden), and [offline-first-pwa-crdt-sync](https://github.com/alihamzazaka/offline-first-pwa-crdt-sync).
 
@@ -103,4 +120,4 @@ npm test
 
 ## Security note
 
-This application is intended for a trusted home/private LAN. It does not provide authentication. Do not expose port 8787 directly to the public internet without adding authentication, HTTPS and appropriate request/URL-fetch protections. In particular, the metadata enrichment endpoint fetches the supplied URL from the laptop.
+This application is intended for a trusted home/private LAN. It does not provide authentication. Do not expose port 8787 directly to the public internet without adding authentication, HTTPS and appropriate request/URL-fetch protections. In particular, the metadata enrichment and link-health endpoints fetch supplied URLs from the laptop.
