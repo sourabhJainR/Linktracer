@@ -6,7 +6,6 @@ let links = [];
 let syncTimer;
 
 const $ = id => document.getElementById(id);
-
 function openDb() {
   return new Promise((resolve, reject) => {
     const r = indexedDB.open(DB_NAME, DB_VERSION);
@@ -55,7 +54,6 @@ function merge(a,b) {
     updatedAt:Math.max(a?.updatedAt||0,b?.updatedAt||0)
   };
 }
-
 async function saveLocal(link, queue=true) {
   const current=(await all('links')).find(x=>x.canonicalUrl===link.canonicalUrl);
   const merged=merge(current,link);
@@ -64,13 +62,11 @@ async function saveLocal(link, queue=true) {
   links=await all('links'); render();
   if (navigator.onLine && 'serviceWorker' in navigator) navigator.serviceWorker.ready.then(r => r.sync?.register('linktracer-sync')).catch(()=>{});
 }
-
 async function enrichOnline(url) {
   const r=await fetch('/api/enrich',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({url})});
   if(!r.ok) throw new Error('enrichment unavailable');
   return r.json();
 }
-
 async function enrichPending() {
   if (!navigator.onLine) return;
   const current = await all('links');
@@ -90,7 +86,6 @@ async function enrichPending() {
     } catch {}
   }
 }
-
 async function sync() {
   if(!navigator.onLine) { setStatus('Offline - local storage active'); return; }
   try {
@@ -127,6 +122,22 @@ async function sync() {
     setStatus(remaining.length ? `Online - ${remaining.length} change(s) queued` : 'Online and synced');
   } catch { setStatus('Offline mode - changes queued safely'); }
 }
+async function exportBackup() {
+  const payload={format:'linktracer-backup',version:1,exportedAt:new Date().toISOString(),links:await all('links')};
+  const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob); const a=document.createElement('a');
+  a.href=url; a.download=`linktracer-backup-${new Date().toISOString().slice(0,10)}.json`; a.click(); URL.revokeObjectURL(url);
+  setStatus('Local backup exported');
+}
+async function importBackup(file) {
+  const payload=JSON.parse(await file.text());
+  if(payload?.format!=='linktracer-backup'||!Array.isArray(payload.links)) throw new Error('Invalid Linktracer backup');
+  for(const link of payload.links) {
+    if(!link.canonicalUrl||!link.url) continue;
+    await saveLocal({...link,canonicalUrl:canonicalize(link.canonicalUrl),deviceId},true);
+  }
+  await sync();
+}
 function setStatus(text){$('status').textContent=text;}
 function render(){
   const q=$('search').value.toLowerCase().trim();
@@ -154,8 +165,10 @@ $('captureForm').addEventListener('submit',async e=>{
 });
 $('search').addEventListener('input',render);
 $('syncBtn').addEventListener('click',sync);
+$('exportBtn').addEventListener('click',exportBackup);
+$('importBtn').addEventListener('click',()=>$('importFile').click());
+$('importFile').addEventListener('change',async e=>{try{if(e.target.files[0])await importBackup(e.target.files[0]);}catch(err){setStatus(`Import failed: ${err.message}`);}finally{e.target.value='';}});
 window.addEventListener('online',sync); window.addEventListener('offline',()=>setStatus('Offline - local storage active'));
 navigator.serviceWorker?.addEventListener('message', e => { if (e.data?.type === 'LINKTRACER_SYNC') sync(); });
-
 (async()=>{links=await all('links');render();setStatus(navigator.onLine?'Online - syncing...':'Offline - local storage active');await sync();syncTimer=setInterval(sync,30000);})();
 if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');
