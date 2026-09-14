@@ -1,180 +1,21 @@
-const DB_NAME = 'linktracer-local';
-const DB_VERSION = 2;
-const deviceId = localStorage.getItem('linktracer-device') || crypto.randomUUID();
-localStorage.setItem('linktracer-device', deviceId);
-let links = [];
-let syncTimer;
-
-const $ = id => document.getElementById(id);
-function openDb() {
-  return new Promise((resolve, reject) => {
-    const r = indexedDB.open(DB_NAME, DB_VERSION);
-    r.onupgradeneeded = () => {
-      const db = r.result;
-      if (!db.objectStoreNames.contains('links')) db.createObjectStore('links', { keyPath: 'canonicalUrl' });
-      if (!db.objectStoreNames.contains('outbox')) db.createObjectStore('outbox', { keyPath: 'id', autoIncrement: true });
-      if (!db.objectStoreNames.contains('meta')) db.createObjectStore('meta', { keyPath: 'key' });
-    };
-    r.onsuccess = () => resolve(r.result); r.onerror = () => reject(r.error);
-  });
-}
-const dbp = openDb();
-function tx(store, mode='readonly') { return dbp.then(db => db.transaction(store, mode).objectStore(store)); }
-function req(r) { return new Promise((resolve,reject) => { r.onsuccess=()=>resolve(r.result); r.onerror=()=>reject(r.error); }); }
-async function all(store) { return req((await tx(store)).getAll()); }
-async function put(store, value) { return req((await tx(store,'readwrite')).put(value)); }
-async function add(store, value) { return req((await tx(store,'readwrite')).add(value)); }
-async function remove(store, key) { return req((await tx(store,'readwrite')).delete(key)); }
-
-function canonicalize(raw) {
-  const u = new URL(raw.trim());
-  if (!['http:','https:'].includes(u.protocol)) throw new Error('Only http and https links are supported');
-  u.hash=''; ['utm_source','utm_medium','utm_campaign','utm_term','utm_content','gclid','fbclid'].forEach(k=>u.searchParams.delete(k));
-  return u.toString().replace(/\/$/,'');
-}
-function localTags(text) {
-  const stop = new Set('the and for with from this that your have into about after before when what which where while link https http www com org net'.split(' '));
-  const counts = {};
-  text.toLowerCase().replace(/[^a-z0-9]+/g,' ').split(/\s+/).filter(w=>w.length>=4&&!stop.has(w)).forEach(w=>counts[w]=(counts[w]||0)+1);
-  return Object.entries(counts).sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0])).slice(0,6).map(x=>x[0]);
-}
-function merge(a,b) {
-  const descriptions=[...(a?.descriptions||[]),...(b?.descriptions||[])];
-  const seen=new Set();
-  const unique=descriptions.filter(d=>d?.text?.trim()).filter(d=>{const k=d.text.trim().toLowerCase();if(seen.has(k))return false;seen.add(k);return true;});
-  return {
-    ...(a||{}), ...(b||{}),
-    canonicalUrl:b?.canonicalUrl||a?.canonicalUrl,
-    url:b?.url||a?.url,
-    title:b?.title||a?.title||'',
-    descriptions:unique,
-    description:unique.map(d=>d.text).join('\n\n'),
-    tags:[...new Set([...(a?.tags||[]),...(b?.tags||[])])],
-    sourceContext:{...(a?.sourceContext||{}),...(b?.sourceContext||{})},
-    updatedAt:Math.max(a?.updatedAt||0,b?.updatedAt||0)
-  };
-}
-async function saveLocal(link, queue=true) {
-  const current=(await all('links')).find(x=>x.canonicalUrl===link.canonicalUrl);
-  const merged=merge(current,link);
-  await put('links',merged);
-  if(queue) await add('outbox',{...merged,changeId:crypto.randomUUID(),deviceId,queuedAt:Date.now()});
-  links=await all('links'); render();
-  if (navigator.onLine && 'serviceWorker' in navigator) navigator.serviceWorker.ready.then(r => r.sync?.register('linktracer-sync')).catch(()=>{});
-}
-async function enrichOnline(url) {
-  const r=await fetch('/api/enrich',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({url})});
-  if(!r.ok) throw new Error('enrichment unavailable');
-  return r.json();
-}
-async function enrichPending() {
-  if (!navigator.onLine) return;
-  const current = await all('links');
-  const candidates = current.filter(l => !l.sourceContext?.enrichedAt).slice(0, 5);
-  for (const link of candidates) {
-    try {
-      const c = await enrichOnline(link.url);
-      const enriched = merge(link, {
-        ...link,
-        title: link.title || c.title,
-        description: c.description || link.description,
-        descriptions: c.description ? [{text:c.description,deviceId:'source',updatedAt:c.enrichedAt}] : [],
-        tags: [...new Set([...(link.tags||[]), ...(c.tags||[]), ...localTags(`${link.url} ${c.title} ${c.description} ${c.excerpt}`)])],
-        sourceContext: {...(link.sourceContext||{}), site:c.site, status:c.status, favicon:c.favicon, excerpt:c.excerpt, enrichedAt:c.enrichedAt}
-      });
-      await saveLocal(enriched, true);
-    } catch {}
-  }
-}
-async function sync() {
-  if(!navigator.onLine) { setStatus('Offline - local storage active'); return; }
-  try {
-    const outbox=await all('outbox');
-    if (outbox.length) {
-      const response=await fetch('/api/sync',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({deviceId,changes:outbox})});
-      if(!response.ok) throw new Error('sync failed');
-      const payload=await response.json();
-      for(const link of payload.links||[]) {
-        const current=(await all('links')).find(x=>x.canonicalUrl===link.canonicalUrl);
-        await put('links',merge(current,link));
-      }
-      for (const change of outbox) if ((payload.acceptedChangeIds||[]).includes(change.changeId)) await remove('outbox', change.id);
-      if ((payload.rejectedChanges||[]).length) setStatus(`${payload.rejectedChanges.length} change(s) retained for retry`);
-    }
-    const cursor=(await req((await tx('meta')).get('cursor')))?.value||0;
-    let nextCursor=cursor;
-    let more=true;
-    while (more) {
-      const pull=await fetch(`/api/links?cursor=${encodeURIComponent(nextCursor)}`);
-      if(!pull.ok) throw new Error('pull failed');
-      const p=await pull.json();
-      for(const link of p.links||[]) {
-        const current=(await all('links')).find(x=>x.canonicalUrl===link.canonicalUrl);
-        await put('links',merge(current,link));
-      }
-      nextCursor=p.cursor ?? nextCursor;
-      more=Boolean(p.hasMore);
-      await put('meta',{key:'cursor',value:nextCursor});
-    }
-    await enrichPending();
-    links=await all('links'); render();
-    const remaining=await all('outbox');
-    setStatus(remaining.length ? `Online - ${remaining.length} change(s) queued` : 'Online and synced');
-  } catch { setStatus('Offline mode - changes queued safely'); }
-}
-async function exportBackup() {
-  const payload={format:'linktracer-backup',version:1,exportedAt:new Date().toISOString(),links:await all('links')};
-  const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
-  const url=URL.createObjectURL(blob); const a=document.createElement('a');
-  a.href=url; a.download=`linktracer-backup-${new Date().toISOString().slice(0,10)}.json`; a.click(); URL.revokeObjectURL(url);
-  setStatus('Local backup exported');
-}
-async function importBackup(file) {
-  const payload=JSON.parse(await file.text());
-  if(payload?.format!=='linktracer-backup'||!Array.isArray(payload.links)) throw new Error('Invalid Linktracer backup');
-  for(const link of payload.links) {
-    if(!link.canonicalUrl||!link.url) continue;
-    await saveLocal({...link,canonicalUrl:canonicalize(link.canonicalUrl),deviceId},true);
-  }
-  await sync();
-}
-function setStatus(text){$('status').textContent=text;}
-function render(){
-  const q=$('search').value.toLowerCase().trim();
-  const shown=links.filter(l=>!q||JSON.stringify(l).toLowerCase().includes(q)).sort((a,b)=>b.updatedAt-a.updatedAt);
-  $('count').textContent=`${shown.length} link${shown.length===1?'':'s'}`;
-  $('links').innerHTML=shown.map(l=>{
-    const c=l.sourceContext||{};
-    const excerpt=c.excerpt||'';
-    const favicon=c.favicon?`<img class="favicon" src="${escapeHtml(c.favicon)}" alt="" loading="lazy" onerror="this.hidden=true">`:'';
-    return `<article class="card link">${favicon}<a class="title" href="${escapeHtml(l.url)}" target="_blank" rel="noreferrer">${escapeHtml(l.title||l.url)}</a><div class="url">${escapeHtml(c.site||l.url)}</div>${l.description?`<p>${escapeHtml(l.description)}</p>`:''}${excerpt?`<details><summary>Saved source context</summary><p class="excerpt">${escapeHtml(excerpt)}</p></details>`:''}<div class="tags">${(l.tags||[]).map(t=>`<span>${escapeHtml(t)}</span>`).join('')}</div><small>${new Date(l.updatedAt||Date.now()).toLocaleString()}</small></article>`;
-  }).join('')||'<div class="empty">No links saved yet.</div>';
-}
-function escapeHtml(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
-
-$('captureForm').addEventListener('submit',async e=>{
-  e.preventDefault();
-  try{
-    const url=canonicalize($('url').value);
-    let title=$('title').value.trim(); let description=$('description').value.trim();
-    let tags=$('tags').value.split(',').map(x=>x.trim().toLowerCase()).filter(Boolean);
-    let sourceContext={deviceId};
-    const now=Date.now();
-    if(navigator.onLine){
-      try{const c=await enrichOnline(url);title=title||c.title;description=description||c.description;tags=[...new Set([...tags,...c.tags])];sourceContext={...sourceContext,site:c.site,status:c.status,favicon:c.favicon,excerpt:c.excerpt,enrichedAt:c.enrichedAt};$('enrichment').textContent='Source context extracted and tags suggested.';}catch{$('enrichment').textContent='Saved locally; source context will be added when connected.';}
-    } else $('enrichment').textContent='Offline: saved locally. Context will be enriched after reconnect.';
-    tags=[...new Set([...tags,...localTags(`${url} ${title} ${description}`)])];
-    await saveLocal({canonicalUrl:url,url,title,description,descriptions:description?[{text:description,deviceId,updatedAt:now}]:[],tags,sourceContext,createdAt:now,updatedAt:now});
-    e.target.reset();
-    await sync();
-  }catch(err){$('enrichment').textContent=err.message;}
-});
-$('search').addEventListener('input',render);
-$('syncBtn').addEventListener('click',sync);
-$('exportBtn').addEventListener('click',exportBackup);
-$('importBtn').addEventListener('click',()=>$('importFile').click());
-$('importFile').addEventListener('change',async e=>{try{if(e.target.files[0])await importBackup(e.target.files[0]);}catch(err){setStatus(`Import failed: ${err.message}`);}finally{e.target.value='';}});
-window.addEventListener('online',sync); window.addEventListener('offline',()=>setStatus('Offline - local storage active'));
-navigator.serviceWorker?.addEventListener('message', e => { if (e.data?.type === 'LINKTRACER_SYNC') sync(); });
-(async()=>{links=await all('links');render();setStatus(navigator.onLine?'Online - syncing...':'Offline - local storage active');await sync();syncTimer=setInterval(sync,30000);})();
-if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');
+const DB_NAME='linktracer-local',DB_VERSION=3,deviceId=localStorage.getItem('linktracer-device')||crypto.randomUUID();localStorage.setItem('linktracer-device',deviceId);let links=[],collections=[],activeCollection='',readerLink=null;const $=id=>document.getElementById(id);
+function openDb(){return new Promise((resolve,reject)=>{const r=indexedDB.open(DB_NAME,DB_VERSION);r.onupgradeneeded=()=>{const db=r.result;if(!db.objectStoreNames.contains('links'))db.createObjectStore('links',{keyPath:'canonicalUrl'});if(!db.objectStoreNames.contains('outbox'))db.createObjectStore('outbox',{keyPath:'id',autoIncrement:true});if(!db.objectStoreNames.contains('meta'))db.createObjectStore('meta',{keyPath:'key'});if(!db.objectStoreNames.contains('collections'))db.createObjectStore('collections',{keyPath:'id'})};r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)})}const dbp=openDb();function tx(s,m='readonly'){return dbp.then(db=>db.transaction(s,m).objectStore(s))}function req(r){return new Promise((a,b)=>{r.onsuccess=()=>a(r.result);r.onerror=()=>b(r.error)})}const all=s=>req(tx(s).then(x=>x.getAll()));const put=(s,v)=>tx(s,'readwrite').then(x=>req(x.put(v)));const add=(s,v)=>tx(s,'readwrite').then(x=>req(x.add(v)));const remove=(s,k)=>tx(s,'readwrite').then(x=>req(x.delete(k)));
+function canonicalize(raw){const u=new URL(raw.trim());if(!['http:','https:'].includes(u.protocol))throw Error('Only http and https links are supported');u.hash='';['utm_source','utm_medium','utm_campaign','utm_term','utm_content','gclid','fbclid'].forEach(k=>u.searchParams.delete(k));return u.toString().replace(/\/$/,'')}function hostname(u){try{return new URL(u).hostname.replace(/^www\./,'').toLowerCase()}catch{return''}}function escapeHtml(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}function tagsFor(t){const stop=new Set('the and for with from this that your have into about after before when what which where while link https http www com org net'.split(' ')),n={};String(t).toLowerCase().replace(/[^a-z0-9]+/g,' ').split(/\s+/).filter(x=>x.length>=4&&!stop.has(x)).forEach(x=>n[x]=(n[x]||0)+1);return Object.entries(n).sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0])).slice(0,8).map(x=>x[0])}
+function merge(a,b){const d=[...(a?.descriptions||[]),...(b?.descriptions||[])],seen=new Set(),descriptions=d.filter(x=>x?.text?.trim()).filter(x=>{const k=x.text.trim().toLowerCase();if(seen.has(k))return false;seen.add(k);return true});return{...(a||{}),...(b||{}),canonicalUrl:b?.canonicalUrl||a?.canonicalUrl,url:b?.url||a?.url,title:b?.title||a?.title||'',descriptions,description:descriptions.map(x=>x.text).join('\n\n'),tags:[...new Set([...(a?.tags||[]),...(b?.tags||[])])],sourceContext:{...(a?.sourceContext||{}),...(b?.sourceContext||{})},updatedAt:Math.max(a?.updatedAt||0,b?.updatedAt||0)}}
+function normTitle(v){return String(v||'').toLowerCase().replace(/[^a-z0-9]+/g,' ').replace(/\b(the|a|an|official|home|homepage)\b/g,' ').replace(/\s+/g,' ').trim()}function dup(l){const t=normTitle(l.title);if(t.length<10)return false;return links.some(x=>x.canonicalUrl!==l.canonicalUrl&&normTitle(x.title)===t&&hostname(x.url)===hostname(l.url))}
+function parseQuery(q){const f={terms:[],tags:[],types:[],domains:[],health:null,duplicate:null,before:null,after:null};for(const raw of String(q||'').match(/(?:[^\s"]+|"[^"]*")+/g)||[]){const t=raw.replace(/^"|"$/g,''),i=t.indexOf(':');if(i<1){f.terms.push(t);continue}const k=t.slice(0,i).toLowerCase(),v=t.slice(i+1).replace(/^"|"$/g,'').toLowerCase();if(k==='tag'&&v)f.tags.push(v);else if(k==='type'&&v)f.types.push(v);else if(k==='domain'&&v)f.domains.push(v);else if(k==='health'&&['healthy','broken','unchecked'].includes(v))f.health=v;else if(k==='duplicate'&&['true','false'].includes(v))f.duplicate=v==='true';else if((k==='before'||k==='after')&&!Number.isNaN(Date.parse(v)))f[k]=Date.parse(v);else f.terms.push(t)}return f}
+function matches(l,f){const c=l.sourceContext||{},text=JSON.stringify(l).toLowerCase(),h=c.health;if(f.terms.some(x=>!text.includes(x)))return false;if(f.tags.length&&!f.tags.every(t=>(l.tags||[]).some(x=>String(x).toLowerCase()===t)))return false;if(f.types.length&&!f.types.includes(String(c.contentType||'webpage').toLowerCase()))return false;if(f.domains.length&&!f.domains.some(d=>hostname(l.url)===d||hostname(l.url).endsWith('.'+d)))return false;if(f.health==='healthy'&&h?.healthy!==true)return false;if(f.health==='broken'&&!(h&&h.healthy===false))return false;if(f.health==='unchecked'&&h)return false;if(f.duplicate!==null&&dup(l)!==f.duplicate)return false;if(f.before!==null&&!(l.updatedAt<f.before))return false;if(f.after!==null&&!(l.updatedAt>=f.after))return false;return true}
+const highlights=l=>Array.isArray(l.sourceContext?.highlights)?l.sourceContext.highlights:[],annotations=l=>Array.isArray(l.sourceContext?.annotations)?l.sourceContext.annotations:[];function knowledge(l,p){return merge(l,{...l,sourceContext:{...(l.sourceContext||{}),...p}})}
+async function saveLocal(l,queue=true){const current=(await all('links')).find(x=>x.canonicalUrl===l.canonicalUrl),m=merge(current,l);await put('links',m);if(queue)await add('outbox',{...m,changeId:crypto.randomUUID(),deviceId,queuedAt:Date.now()});links=await all('links');render()}
+async function enrich(url){const r=await fetch('/api/enrich',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({url})});if(!r.ok)throw Error('enrichment unavailable');return r.json()}async function health(l){if(!navigator.onLine)return setStatus('Offline - health check deferred');try{const r=await fetch('/api/link-health',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({url:l.url})});if(!r.ok)throw Error();const h=await r.json();await saveLocal(knowledge(l,{health:h}));setStatus(h.healthy?`Healthy (${h.status})`:`Link problem (${h.status||'unreachable'})`);await sync()}catch{setStatus('Health check unavailable')}}
+async function enrichPending(){if(!navigator.onLine)return;for(const l of (await all('links')).filter(x=>!x.sourceContext?.enrichedAt).slice(0,5))try{const c=await enrich(l.url);await saveLocal(merge(l,{...l,title:l.title||c.title,description:c.description||l.description,descriptions:c.description?[{text:c.description,deviceId:'source',updatedAt:c.enrichedAt}]:[],tags:[...new Set([...(l.tags||[]),...(c.tags||[]),...tagsFor(`${l.url} ${c.title} ${c.description} ${c.excerpt}`)])],sourceContext:{...(l.sourceContext||{}),site:c.site,status:c.status,finalUrl:c.finalUrl,favicon:c.favicon,excerpt:c.excerpt,contentType:c.contentType,enrichedAt:c.enrichedAt}})))}catch{}}
+async function sync(){if(!navigator.onLine)return setStatus('Offline - local storage active');try{const out=await all('outbox');if(out.length){const r=await fetch('/api/sync',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({deviceId,changes:out})});if(!r.ok)throw Error();const p=await r.json();for(const l of p.links||[])await put('links',merge((await all('links')).find(x=>x.canonicalUrl===l.canonicalUrl),l));for(const x of out)if((p.acceptedChangeIds||[]).includes(x.changeId))await remove('outbox',x.id)}let cursor=(await req((await tx('meta')).get('cursor')))?.value||0,more=true;while(more){const r=await fetch(`/api/links?cursor=${cursor}`);if(!r.ok)throw Error();const p=await r.json();for(const l of p.links||[])await put('links',merge((await all('links')).find(x=>x.canonicalUrl===l.canonicalUrl),l));cursor=p.cursor??cursor;more=!!p.hasMore;await put('meta',{key:'cursor',value:cursor})}await enrichPending();links=await all('links');render();setStatus((await all('outbox')).length?'Online - changes queued':'Online and synced')}catch{setStatus('Offline mode - changes queued safely')}}
+async function backup(){const payload={format:'linktracer-backup',version:2,exportedAt:new Date().toISOString(),links:await all('links'),collections:await all('collections')},a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}));a.download=`linktracer-backup-${new Date().toISOString().slice(0,10)}.json`;a.click();setStatus('Knowledge backup exported')}async function restore(file){const p=JSON.parse(await file.text());if(p?.format!=='linktracer-backup'||!Array.isArray(p.links))throw Error('Invalid Linktracer backup');for(const l of p.links)if(l.canonicalUrl&&l.url)await saveLocal({...l,canonicalUrl:canonicalize(l.canonicalUrl),deviceId});for(const c of p.collections||[])if(c.id&&c.name)await put('collections',c);collections=await all('collections');renderCollections();await sync()}
+function setStatus(x){$('status').textContent=x}function visible(){let s=links.filter(l=>matches(l,parseQuery($('search').value)));const t=$('typeFilter').value.toLowerCase(),h=$('healthFilter').value;if(t)s=s.filter(l=>String(l.sourceContext?.contentType||'webpage').toLowerCase()===t);if(h)s=s.filter(l=>h==='healthy'?l.sourceContext?.health?.healthy===true:h==='broken'?l.sourceContext?.health?.healthy===false:!l.sourceContext?.health);if(activeCollection){const c=collections.find(x=>x.id===activeCollection);if(c)s=s.filter(l=>matches(l,parseQuery(c.query)))}return s.sort((a,b)=>b.updatedAt-a.updatedAt)}
+function renderCollections(){const e=$('collections');e.innerHTML=`<button class="collection ${!activeCollection?'active':''}" data-c="">All links</button>`+collections.map(c=>`<button class="collection ${activeCollection===c.id?'active':''}" data-c="${escapeHtml(c.id)}">${escapeHtml(c.name)}</button>`).join('')+'<button id="saveCollection" class="collection add">+ Save current filter</button>';e.querySelectorAll('[data-c]').forEach(b=>b.onclick=()=>{activeCollection=b.dataset.c||'';renderCollections();render()});$('saveCollection').onclick=saveCollection}
+async function saveCollection(){const q=$('search').value.trim();if(!q)return setStatus('Enter a search/filter before saving a collection');const name=prompt('Collection name',q.slice(0,40));if(!name?.trim())return;const c={id:crypto.randomUUID(),name:name.trim(),query:q,createdAt:Date.now(),updatedAt:Date.now()};await put('collections',c);collections=await all('collections');activeCollection=c.id;renderCollections();render();setStatus(`Saved collection: ${c.name}`)}async function deleteCollection(){if(!activeCollection)return;const c=collections.find(x=>x.id===activeCollection);if(c&&confirm(`Delete collection “${c.name}”?`)){await remove('collections',c.id);activeCollection='';collections=await all('collections');renderCollections();render()}}
+function openReader(l){readerLink=l;const c=l.sourceContext||{};$('readerTitle').textContent=l.title||l.url;$('readerMeta').textContent=`${c.site||hostname(l.url)} · ${highlights(l).length} highlights · ${annotations(l).length} notes`;$('readerBody').innerHTML=`<p>${escapeHtml(l.description||'')}</p>${c.excerpt?`<p>${escapeHtml(c.excerpt)}</p>`:'<p class="muted">No saved source text yet. Re-enrich when online.</p>'}<hr>${highlights(l).map((h,i)=>`<blockquote class="savedHighlight"><strong>Highlight ${i+1}</strong><br>${escapeHtml(h.text)}${h.note?`<footer>${escapeHtml(h.note)}</footer>`:''}</blockquote>`).join('')}${annotations(l).map(a=>`<div class="annotation"><strong>Annotation</strong><p>${escapeHtml(a.text)}</p><small>${new Date(a.createdAt).toLocaleString()}</small></div>`).join('')}`;$('readerOpenLink').href=l.url;$('readerDialog').showModal()}
+async function addHighlight(){if(!readerLink)return;const s=window.getSelection()?.toString().trim();if(!s)return setStatus('Select text in Reader mode first');const note=prompt('Optional note for this highlight','');await saveLocal(knowledge(readerLink,{highlights:[...highlights(readerLink),{id:crypto.randomUUID(),text:s,note:note?.trim()||'',createdAt:Date.now()}]}));readerLink=(await all('links')).find(x=>x.canonicalUrl===readerLink.canonicalUrl);openReader(readerLink);setStatus('Highlight saved')}async function addAnnotation(l){const t=prompt('Add a note to this link');if(!t?.trim())return;await saveLocal(knowledge(l,{annotations:[...annotations(l),{id:crypto.randomUUID(),text:t.trim(),createdAt:Date.now(),deviceId}]}));setStatus('Annotation saved')}
+function render(){const s=visible();$('count').textContent=`${s.length} link${s.length===1?'':'s'}`;$('summary').innerHTML=`<span>${links.length} total</span><span>${links.filter(dup).length} possible duplicates</span><span>${links.filter(l=>l.sourceContext?.health&&!l.sourceContext.health.healthy).length} broken/unreachable</span><span>${links.filter(l=>!l.sourceContext?.health).length} unchecked</span><span>${links.reduce((n,l)=>n+highlights(l).length,0)} highlights</span><span>${links.reduce((n,l)=>n+annotations(l).length,0)} notes</span>`;$('links').innerHTML=s.map(l=>{const c=l.sourceContext||{},h=c.health,d=dup(l);return `<article class="card link"><div class="linkTop">${c.favicon?`<img class="favicon" src="${escapeHtml(c.favicon)}" alt="" onerror="this.hidden=true">`:''}<div class="linkHead"><div><a class="title" href="${escapeHtml(l.url)}" target="_blank" rel="noreferrer">${escapeHtml(l.title||l.url)}</a><div class="url">${escapeHtml(c.site||hostname(l.url))}</div></div><span class="type">${escapeHtml(c.contentType||'webpage')}</span></div></div>${l.description?`<p>${escapeHtml(l.description)}</p>`:''}${c.excerpt?`<details><summary>Saved source context</summary><p class="excerpt">${escapeHtml(c.excerpt)}</p></details>`:''}<div class="badges"><span class="health ${h?.healthy?'ok':h?'bad':'unknown'}">${h?(h.healthy?'Healthy':'Problem'):'Unchecked'}${h?.status?` · ${h.status}`:''}</span>${d?'<span class="duplicate">Possible duplicate</span>':''}${highlights(l).length?`<span class="knowledgeBadge">${highlights(l).length} highlights</span>`:''}${annotations(l).length?`<span class="knowledgeBadge">${annotations(l).length} notes</span>`:''}</div><div class="tags">${(l.tags||[]).map(t=>`<span>${escapeHtml(t)}</span>`).join('')}</div><div class="linkActions"><small>${new Date(l.updatedAt||Date.now()).toLocaleString()}</small><div><button data-reader="${escapeHtml(l.canonicalUrl)}">Reader</button><button data-note="${escapeHtml(l.canonicalUrl)}">Annotate</button><button data-health="${escapeHtml(l.canonicalUrl)}">Check</button></div></div></article>`}).join('')||'<div class="empty">No links match the current filters.</div>';document.querySelectorAll('[data-reader]').forEach(b=>b.onclick=()=>openReader(links.find(x=>x.canonicalUrl===b.dataset.reader)));document.querySelectorAll('[data-note]').forEach(b=>b.onclick=()=>addAnnotation(links.find(x=>x.canonicalUrl===b.dataset.note)));document.querySelectorAll('[data-health]').forEach(b=>b.onclick=()=>health(links.find(x=>x.canonicalUrl===b.dataset.health)))}
+$('captureForm').onsubmit=async e=>{e.preventDefault();try{const url=canonicalize($('url').value);let title=$('title').value.trim(),description=$('description').value.trim(),tags=$('tags').value.split(',').map(x=>x.trim().toLowerCase()).filter(Boolean),context={deviceId},now=Date.now();if(navigator.onLine)try{const c=await enrich(url);title=title||c.title;description=description||c.description;tags=[...new Set([...tags,...c.tags])];context={...context,site:c.site,status:c.status,finalUrl:c.finalUrl,favicon:c.favicon,excerpt:c.excerpt,contentType:c.contentType,enrichedAt:c.enrichedAt};$('enrichment').textContent=`Saved as ${c.contentType}; source context extracted.`}catch{$('enrichment').textContent='Saved locally; context will be added when connected.'}else $('enrichment').textContent='Offline: saved locally. Context will be enriched after reconnect.';await saveLocal({canonicalUrl:url,url,title,description,descriptions:description?[{text:description,deviceId,updatedAt:now}]:[],tags:[...new Set([...tags,...tagsFor(`${url} ${title} ${description}`)])],sourceContext:context,createdAt:now,updatedAt:now});e.target.reset();await sync()}catch(err){$('enrichment').textContent=err.message}};
+$('search').oninput=render;$('typeFilter').onchange=render;$('healthFilter').onchange=render;$('clearSearch').onclick=()=>{$('search').value='';activeCollection='';renderCollections();render()};$('syncBtn').onclick=sync;$('exportBtn').onclick=backup;$('importBtn').onclick=()=>$('importFile').click();$('importFile').onchange=async e=>{try{if(e.target.files[0])await restore(e.target.files[0])}catch(x){setStatus(`Import failed: ${x.message}`)}finally{e.target.value=''}};$('deleteCollection').onclick=deleteCollection;$('readerHighlight').onclick=addHighlight;$('readerClose').onclick=()=>$('readerDialog').close();window.addEventListener('online',sync);window.addEventListener('offline',()=>setStatus('Offline - local storage active'));(async()=>{links=await all('links');collections=await all('collections');renderCollections();render();setStatus(navigator.onLine?'Online - syncing...':'Offline - local storage active');await sync();setInterval(sync,30000)})();if('serviceWorker'in navigator)navigator.serviceWorker.register('/sw.js');
