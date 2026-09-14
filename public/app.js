@@ -1,5 +1,5 @@
 const DB_NAME = 'linktracer-local';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const deviceId = localStorage.getItem('linktracer-device') || crypto.randomUUID();
 localStorage.setItem('linktracer-device', deviceId);
 let links = [];
@@ -25,7 +25,7 @@ function req(r) { return new Promise((resolve,reject) => { r.onsuccess=()=>resol
 async function all(store) { return req((await tx(store)).getAll()); }
 async function put(store, value) { return req((await tx(store,'readwrite')).put(value)); }
 async function add(store, value) { return req((await tx(store,'readwrite')).add(value)); }
-async function clear(store) { return req((await tx(store,'readwrite')).clear()); }
+async function remove(store, key) { return req((await tx(store,'readwrite')).delete(key)); }
 
 function canonicalize(raw) {
   const u = new URL(raw.trim());
@@ -60,8 +60,9 @@ async function saveLocal(link, queue=true) {
   const current=(await all('links')).find(x=>x.canonicalUrl===link.canonicalUrl);
   const merged=merge(current,link);
   await put('links',merged);
-  if(queue) await add('outbox',{...merged,id:undefined,deviceId,queuedAt:Date.now()});
+  if(queue) await add('outbox',{...merged,changeId:crypto.randomUUID(),deviceId,queuedAt:Date.now()});
   links=await all('links'); render();
+  if (navigator.onLine && 'serviceWorker' in navigator) navigator.serviceWorker.ready.then(r => r.sync?.register('linktracer-sync')).catch(()=>{});
 }
 
 async function enrichOnline(url) {
@@ -70,20 +71,61 @@ async function enrichOnline(url) {
   return r.json();
 }
 
+async function enrichPending() {
+  if (!navigator.onLine) return;
+  const current = await all('links');
+  const candidates = current.filter(l => !l.sourceContext?.enrichedAt).slice(0, 5);
+  for (const link of candidates) {
+    try {
+      const c = await enrichOnline(link.url);
+      const enriched = merge(link, {
+        ...link,
+        title: link.title || c.title,
+        description: c.description || link.description,
+        descriptions: c.description ? [{text:c.description,deviceId:'source',updatedAt:c.enrichedAt}] : [],
+        tags: [...new Set([...(link.tags||[]), ...(c.tags||[]), ...localTags(`${link.url} ${c.title} ${c.description}`)])],
+        sourceContext: {...(link.sourceContext||{}), site:c.site, status:c.status, enrichedAt:c.enrichedAt}
+      });
+      await saveLocal(enriched, true);
+    } catch {}
+  }
+}
+
 async function sync() {
-  if(!navigator.onLine) { setStatus('Offline'); return; }
+  if(!navigator.onLine) { setStatus('Offline - local storage active'); return; }
   try {
     const outbox=await all('outbox');
-    const response=await fetch('/api/sync',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({deviceId,changes:outbox})});
-    if(!response.ok) throw new Error('sync failed');
-    const payload=await response.json();
-    for(const link of payload.links||[]) await put('links',merge((await all('links')).find(x=>x.canonicalUrl===link.canonicalUrl),link));
-    await clear('outbox');
-    const since=(await req((await tx('meta')).get('serverTime')))?.value||0;
-    const pull=await fetch(`/api/links?since=${encodeURIComponent(since)}`);
-    if(pull.ok){const p=await pull.json();for(const link of p.links||[]) await put('links',merge((await all('links')).find(x=>x.canonicalUrl===link.canonicalUrl),link));await put('meta',{key:'serverTime',value:p.serverTime});}
-    links=await all('links'); render(); setStatus('Online and synced');
-  } catch { setStatus('Offline mode - changes queued'); }
+    if (outbox.length) {
+      const response=await fetch('/api/sync',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({deviceId,changes:outbox})});
+      if(!response.ok) throw new Error('sync failed');
+      const payload=await response.json();
+      for(const link of payload.links||[]) {
+        const current=(await all('links')).find(x=>x.canonicalUrl===link.canonicalUrl);
+        await put('links',merge(current,link));
+      }
+      for (const change of outbox) if ((payload.acceptedChangeIds||[]).includes(change.changeId)) await remove('outbox', change.id);
+      if ((payload.rejectedChanges||[]).length) setStatus(`${payload.rejectedChanges.length} change(s) retained for retry`);
+    }
+    const cursor=(await req((await tx('meta')).get('cursor')))?.value||0;
+    let nextCursor=cursor;
+    let more=true;
+    while (more) {
+      const pull=await fetch(`/api/links?cursor=${encodeURIComponent(nextCursor)}`);
+      if(!pull.ok) throw new Error('pull failed');
+      const p=await pull.json();
+      for(const link of p.links||[]) {
+        const current=(await all('links')).find(x=>x.canonicalUrl===link.canonicalUrl);
+        await put('links',merge(current,link));
+      }
+      nextCursor=p.cursor ?? nextCursor;
+      more=Boolean(p.hasMore);
+      await put('meta',{key:'cursor',value:nextCursor});
+    }
+    await enrichPending();
+    links=await all('links'); render();
+    const remaining=await all('outbox');
+    setStatus(remaining.length ? `Online - ${remaining.length} change(s) queued` : 'Online and synced');
+  } catch { setStatus('Offline mode - changes queued safely'); }
 }
 function setStatus(text){$('status').textContent=text;}
 function render(){
@@ -113,6 +155,7 @@ $('captureForm').addEventListener('submit',async e=>{
 $('search').addEventListener('input',render);
 $('syncBtn').addEventListener('click',sync);
 window.addEventListener('online',sync); window.addEventListener('offline',()=>setStatus('Offline - local storage active'));
+navigator.serviceWorker?.addEventListener('message', e => { if (e.data?.type === 'LINKTRACER_SYNC') sync(); });
 
 (async()=>{links=await all('links');render();setStatus(navigator.onLine?'Online - syncing...':'Offline - local storage active');await sync();syncTimer=setInterval(sync,30000);})();
 if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');
