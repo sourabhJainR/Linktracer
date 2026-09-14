@@ -1,0 +1,60 @@
+const URL_RE=/https?:\/\/[^\s<>"'`]+/gi;
+const URL_TRAILING=/[),.;!?\]}]+$/g;
+const DATE_RE=/^\s*(?:\[?\s*)?\d{1,4}[\/.-]\d{1,2}[\/.-]\d{2,4}[,\s]+\d{1,2}:\d{2}(?::\d{2})?\s*(?:\]|[-–—])?/;
+
+export function canonicalizeUrl(raw){
+  const value=String(raw||'').trim().replace(URL_TRAILING,'');
+  const u=new URL(value);
+  if(!['http:','https:'].includes(u.protocol)) throw new Error('Only http and https links are supported');
+  u.hash='';
+  for(const key of [...u.searchParams.keys()]) if(/^(utm_|gclid$|fbclid$)/i.test(key)) u.searchParams.delete(key);
+  return u.toString().replace(/\/$/,'');
+}
+
+export function extractUrls(text){
+  const seen=new Set();
+  const result=[];
+  for(const raw of String(text||'').match(URL_RE)||[]){
+    try{
+      const url=canonicalizeUrl(raw);
+      if(!seen.has(url)){seen.add(url);result.push(url)}
+    }catch{}
+  }
+  return result;
+}
+
+export function parseWhatsAppMessages(text){
+  const lines=String(text||'').replace(/\uFEFF/g,'').split(/\r?\n/);
+  const records=[];
+  let current=null;
+  for(const rawLine of lines){
+    const line=rawLine.trimEnd();
+    const match=line.match(DATE_RE);
+    if(match){
+      if(current) records.push(current);
+      const body=line.slice(match[0].length).trim();
+      current={header:match[0].trim(),text:body,raw:line};
+    }else if(current){
+      current.text+=` ${line.trim()}`;
+      current.raw+=`\n${line}`;
+    }else if(line.trim()){
+      records.push({header:'',text:line.trim(),raw:line});
+    }
+  }
+  if(current) records.push(current);
+  return records;
+}
+
+export function messageForUrl(url,records){
+  const record=records.find(x=>x.text.includes(url)||x.raw.includes(url));
+  if(!record) return '';
+  let message=record.text;
+  message=message.replace(/^[^:]{1,100}:\s*/,'');
+  message=message.replace(url,'');
+  return message.replace(/\s+/g,' ').trim();
+}
+
+export function importableWhatsAppLinks(text){
+  const records=parseWhatsAppMessages(text);
+  return extractUrls(text).map(url=>({url,message:messageForUrl(url,records)}));
+}
