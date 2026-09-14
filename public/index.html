@@ -14,7 +14,7 @@
 <main>
 <section class="capture card"><form id="captureForm"><input id="url" type="url" placeholder="Paste a link" required autocomplete="url"><input id="title" type="text" placeholder="Title (optional)"><textarea id="description" rows="3" placeholder="Description or why you saved it"></textarea><div class="row"><input id="tags" type="text" placeholder="Tags, comma separated"><button type="submit">Save link</button></div></form><p id="enrichment" class="hint">Context, classification and suggested tags are added when connected.</p></section>
 <section class="workspace card"><div class="workspaceTitle"><strong>Smart collections</strong><button id="deleteCollection" type="button" class="subtle">Delete selected</button></div><div id="collections" class="collections"></div></section>
-<section class="workspace card researchWorkspaceCard"><div class="workspaceTitle"><strong>Research Planning + Progress</strong><span class="hint">Evidence-driven sessions, deadlines and decision readiness</span></div><div id="researchWorkspace"></div></section>
+<section class="workspace card researchWorkspaceCard"><div class="workspaceTitle"><strong>Research Planning + Progress</strong><span class="hint">Turn evidence gaps into due-date driven research sessions</span></div><div id="researchWorkspace"></div></section>
 <section class="workspace card knowledgeRadarCard"><div class="workspaceTitle"><strong>Knowledge Radar</strong><span class="hint">Local signals, rediscovery and evidence</span></div><div id="knowledgeRadar"></div></section>
 <section class="workspace card evidenceGraphCard"><div class="workspaceTitle"><strong>Personal Evidence Graph</strong><span class="hint">Claims, topics and source relationships</span></div><div id="knowledgeGraph"></div></section>
 <section class="workspace card knowledgeGapsCard"><div class="workspaceTitle"><strong>Knowledge Gaps + Evidence Quality</strong><span class="hint">Find weak, single-source and conflicting knowledge</span></div><div id="knowledgeGaps"></div></section>
@@ -23,6 +23,6 @@
 <section id="summary" class="summary"></section><section id="links" class="grid"></section>
 </main>
 <dialog id="readerDialog" class="readerDialog"><div class="readerHeader"><div><h2 id="readerTitle">Reader</h2><div id="readerMeta" class="readerMeta"></div></div><button id="readerClose" type="button" class="subtle">Close</button></div><article id="readerBody" class="readerBody"></article><footer class="readerFooter"><button id="readerHighlight" type="button">Save selected text as highlight</button><a id="readerOpenLink" href="#" target="_blank" rel="noreferrer" data-url="">Open source</a></footer></dialog>
-<script src="/app.js" type="module"></script><script src="/moat.js"></script><script src="/gaps.js"></script><script src="/confidence.js" type="module"></script><script src="/research.js" type="module"></script>
+<script src="/app.js" type="module"></script><script src="/moat.js"></script><script src="/gaps.js"></script><script src="/confidence.js" type="module"></script><script src="/research.js"></script>
 </body>
 </html>
