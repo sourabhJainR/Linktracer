@@ -63,7 +63,7 @@ function classify(url, title = '', text = '') {
   const rules = [
     ['video', /youtube|youtu\.be|vimeo|video|watch/],
     ['code', /github|gitlab|bitbucket|stackoverflow|\.md\b|repository|source code|api reference/],
-    ['documentation', /docs\.|documentation|reference|developer|/\/docs(?:\/|$)|/\/api(?:\/|$)/],
+    ['documentation', /docs\.|documentation|reference|developer|\/docs(?:\/|$)|\/api(?:\/|$)/],
     ['article', /article|blog|post|medium\.com|substack|news|journal|read|analysis/],
     ['paper', /arxiv|researchgate|doi\.org|paper|abstract|proceedings|publication/],
     ['social', /x\.com|twitter|linkedin|reddit|threads|facebook/],
@@ -152,10 +152,7 @@ app.get('/api/search', (req, res) => {
   const rows = db.prepare('SELECT * FROM links ORDER BY updated_at DESC').all().map(rowToLink);
   if (!q) return res.json({ links: rows.slice(0, 100), count: rows.length });
   const terms = q.split(/\s+/).filter(Boolean);
-  const results = rows.filter(link => {
-    const hay = JSON.stringify(link).toLowerCase();
-    return terms.every(term => hay.includes(term));
-  }).slice(0, 100);
+  const results = rows.filter(link => { const hay = JSON.stringify(link).toLowerCase(); return terms.every(term => hay.includes(term)); }).slice(0, 100);
   res.json({ links: results, count: results.length });
 });
 const syncBatch = db.transaction((changes) => {
