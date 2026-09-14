@@ -1,0 +1,17 @@
+{
+  "name": "linktracer",
+  "version": "1.0.0",
+  "private": true,
+  "description": "LAN-hosted, offline-first link capture and synchronization app",
+  "type": "module",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node --watch server/index.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.10.0",
+    "express": "^5.1.0",
+    "jsdom": "^26.1.0"
+  }
+}
