@@ -79,8 +79,8 @@ async function enrichPending() {
         title: link.title || c.title,
         description: c.description || link.description,
         descriptions: c.description ? [{text:c.description,deviceId:'source',updatedAt:c.enrichedAt}] : [],
-        tags: [...new Set([...(link.tags||[]), ...(c.tags||[]), ...localTags(`${link.url} ${c.title} ${c.description}`)])],
-        sourceContext: {...(link.sourceContext||{}), site:c.site, status:c.status, enrichedAt:c.enrichedAt}
+        tags: [...new Set([...(link.tags||[]), ...(c.tags||[]), ...localTags(`${link.url} ${c.title} ${c.description} ${c.excerpt}`)])],
+        sourceContext: {...(link.sourceContext||{}), site:c.site, status:c.status, favicon:c.favicon, excerpt:c.excerpt, enrichedAt:c.enrichedAt}
       });
       await saveLocal(enriched, true);
     } catch {}
@@ -143,7 +143,12 @@ function render(){
   const q=$('search').value.toLowerCase().trim();
   const shown=links.filter(l=>!q||JSON.stringify(l).toLowerCase().includes(q)).sort((a,b)=>b.updatedAt-a.updatedAt);
   $('count').textContent=`${shown.length} link${shown.length===1?'':'s'}`;
-  $('links').innerHTML=shown.map(l=>`<article class="card link"><a class="title" href="${escapeHtml(l.url)}" target="_blank" rel="noreferrer">${escapeHtml(l.title||l.url)}</a><div class="url">${escapeHtml(l.url)}</div>${l.description?`<p>${escapeHtml(l.description)}</p>`:''}<div class="tags">${(l.tags||[]).map(t=>`<span>${escapeHtml(t)}</span>`).join('')}</div><small>${new Date(l.updatedAt||Date.now()).toLocaleString()}</small></article>`).join('')||'<div class="empty">No links saved yet.</div>';
+  $('links').innerHTML=shown.map(l=>{
+    const c=l.sourceContext||{};
+    const excerpt=c.excerpt||'';
+    const favicon=c.favicon?`<img class="favicon" src="${escapeHtml(c.favicon)}" alt="" loading="lazy" onerror="this.hidden=true">`:'';
+    return `<article class="card link">${favicon}<a class="title" href="${escapeHtml(l.url)}" target="_blank" rel="noreferrer">${escapeHtml(l.title||l.url)}</a><div class="url">${escapeHtml(c.site||l.url)}</div>${l.description?`<p>${escapeHtml(l.description)}</p>`:''}${excerpt?`<details><summary>Saved source context</summary><p class="excerpt">${escapeHtml(excerpt)}</p></details>`:''}<div class="tags">${(l.tags||[]).map(t=>`<span>${escapeHtml(t)}</span>`).join('')}</div><small>${new Date(l.updatedAt||Date.now()).toLocaleString()}</small></article>`;
+  }).join('')||'<div class="empty">No links saved yet.</div>';
 }
 function escapeHtml(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 
@@ -153,12 +158,13 @@ $('captureForm').addEventListener('submit',async e=>{
     const url=canonicalize($('url').value);
     let title=$('title').value.trim(); let description=$('description').value.trim();
     let tags=$('tags').value.split(',').map(x=>x.trim().toLowerCase()).filter(Boolean);
+    let sourceContext={deviceId};
     const now=Date.now();
     if(navigator.onLine){
-      try{const c=await enrichOnline(url);title=title||c.title;description=description||c.description;tags=[...new Set([...tags,...c.tags])];$('enrichment').textContent='Source context extracted and tags suggested.';}catch{$('enrichment').textContent='Saved locally; source context will be added when connected.';}
+      try{const c=await enrichOnline(url);title=title||c.title;description=description||c.description;tags=[...new Set([...tags,...c.tags])];sourceContext={...sourceContext,site:c.site,status:c.status,favicon:c.favicon,excerpt:c.excerpt,enrichedAt:c.enrichedAt};$('enrichment').textContent='Source context extracted and tags suggested.';}catch{$('enrichment').textContent='Saved locally; source context will be added when connected.';}
     } else $('enrichment').textContent='Offline: saved locally. Context will be enriched after reconnect.';
     tags=[...new Set([...tags,...localTags(`${url} ${title} ${description}`)])];
-    await saveLocal({canonicalUrl:url,url,title,description,descriptions:description?[{text:description,deviceId,updatedAt:now}]:[],tags,sourceContext:{deviceId},createdAt:now,updatedAt:now});
+    await saveLocal({canonicalUrl:url,url,title,description,descriptions:description?[{text:description,deviceId,updatedAt:now}]:[],tags,sourceContext,createdAt:now,updatedAt:now});
     e.target.reset();
     await sync();
   }catch(err){$('enrichment').textContent=err.message;}
