@@ -10,7 +10,7 @@
   <title>Linktracer</title>
 </head>
 <body>
-<header class="topbar"><div><h1>Linktracer</h1><span id="status">Starting...</span></div><div class="actions"><button id="syncBtn">Sync</button><button id="exportBtn" type="button">Export</button><button id="importBtn" type="button">Import</button><input id="importFile" type="file" accept="application/json" hidden></div></header>
+<header class="topbar"><div><h1>Linktracer</h1><span id="status">Starting...</span></div><div class="actions"><button id="syncBtn" type="button">Sync</button><button id="exportBtn" type="button">Export</button><button id="importBtn" type="button">Import</button><input id="importFile" type="file" accept=".json,.txt,text/plain,application/json" hidden></div></header>
 <main>
 <section class="capture card"><form id="captureForm"><input id="url" type="url" placeholder="Paste a link" required autocomplete="url"><input id="title" type="text" placeholder="Title (optional)"><textarea id="description" rows="3" placeholder="Description or why you saved it"></textarea><div class="row"><input id="tags" type="text" placeholder="Tags, comma separated"><button type="submit">Save link</button></div></form><p id="enrichment" class="hint">Context, classification and suggested tags are added when connected.</p></section>
 <section class="workspace card"><div class="workspaceTitle"><strong>Smart collections</strong><button id="deleteCollection" type="button" class="subtle">Delete selected</button></div><div id="collections" class="collections"></div></section>
@@ -23,6 +23,6 @@
 <section id="summary" class="summary"></section><section id="links" class="grid"></section>
 </main>
 <dialog id="readerDialog" class="readerDialog"><div class="readerHeader"><div><h2 id="readerTitle">Reader</h2><div id="readerMeta" class="readerMeta"></div></div><button id="readerClose" type="button" class="subtle">Close</button></div><article id="readerBody" class="readerBody"></article><footer class="readerFooter"><button id="readerHighlight" type="button">Save selected text as highlight</button><a id="readerOpenLink" href="#" target="_blank" rel="noreferrer" data-url="">Open source</a></footer></dialog>
-<script src="/app.js" type="module"></script><script src="/moat.js"></script><script src="/gaps.js"></script><script src="/confidence.js" type="module"></script><script src="/research.js"></script><script src="/category-sync.js"></script><script src="/category-tabs.js"></script>
+<script src="/app.js" type="module"></script><script src="/moat.js"></script><script src="/gaps.js"></script><script src="/confidence.js" type="module"></script><script src="/research.js"></script><script src="/category-sync.js"></script><script src="/category-tabs.js"></script><script src="/io.js" type="module"></script>
 </body>
 </html>
