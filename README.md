@@ -68,7 +68,23 @@ Linktracer intentionally stays small, but its architecture follows proven patter
 
 Recent open-source systems reinforce the value of this direction: Karakeep combines full-text search, local-model tagging, summaries, highlights and archival; Linklore combines SQLite with hybrid retrieval and private RAG; and local-first knowledge-graph projects expose relationships and agent access without requiring a hosted service.
 
-## Run on the laptop
+## Download a ready-to-run portable bundle
+
+The repository publishes platform-specific portable ZIP bundles from GitHub Actions. Each bundle contains the Linktracer application, production dependencies and its own Node.js 20 runtime, so the target machine does **not** need Node.js or npm installed.
+
+Download the latest successful **Portable Bundles** workflow artifact from the repository's Actions page, or download the ZIP assets from a tagged GitHub Release.
+
+Supported bundles:
+
+- `Linktracer-windows-x64.zip` — extract and double-click `start-linktracer.cmd`.
+- `Linktracer-linux-x64.zip` — extract and run `./start-linktracer.sh`.
+- `Linktracer-macos-x64.zip` — extract and run `./start-linktracer.sh`.
+
+The launcher starts the local server and opens `http://localhost:8787`. The SQLite database is kept in the bundle's `data/` directory, so the extracted folder is the portable application plus its local data.
+
+For upgrades, extract the new bundle into a new folder and use the application's JSON **Export** / **Import** backup when you want to carry browser-local data across machines. Keep the server-side `data/linktracer.db` backup as the primary LAN-store recovery copy.
+
+## Run from source
 
 Requires Node.js 20+.
 
