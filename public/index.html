@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#111827">
+  <meta name="description" content="Offline-first personal link library">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="stylesheet" href="/styles.css">
+  <title>Linktracer</title>
+</head>
+<body>
+<header class="topbar">
+  <div><h1>Linktracer</h1><span id="status">Starting...</span></div>
+  <button id="syncBtn">Sync</button>
+</header>
+<main>
+  <section class="capture card">
+    <form id="captureForm">
+      <input id="url" type="url" placeholder="Paste a link" required autocomplete="url">
+      <input id="title" type="text" placeholder="Title (optional)">
+      <textarea id="description" rows="3" placeholder="Description or why you saved it"></textarea>
+      <div class="row"><input id="tags" type="text" placeholder="Tags, comma separated"><button type="submit">Save link</button></div>
+    </form>
+    <p id="enrichment" class="hint">Context and suggested tags are added when the laptop is reachable.</p>
+  </section>
+  <section class="toolbar">
+    <input id="search" type="search" placeholder="Search links, tags and descriptions">
+    <span id="count"></span>
+  </section>
+  <section id="links" class="grid"></section>
+</main>
+<script src="/app.js" type="module"></script>
+</body>
+</html>
