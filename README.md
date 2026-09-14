@@ -13,7 +13,7 @@ Linktracer is an offline-first personal link library designed to run on a laptop
 - Union tags across devices.
 - Preserve distinct descriptions from different devices and de-duplicate identical descriptions.
 - Extract page title, description, hostname, final URL and readable source context when the laptop can reach the source URL.
-- Classify captured pages into useful deterministic types such as article, code, documentation, paper, video, social, product or webpage.
+- Classify captured pages into deterministic types such as article, code, documentation, paper, video, social, product or webpage.
 - Generate deterministic suggested tags locally and on the server.
 - Retry source enrichment after reconnect for links saved while offline.
 - Search locally with free-text terms plus smart filters such as `tag:ai`, `type:article`, `domain:github.com`, `health:broken`, `duplicate:true`, `before:2026-09-01` and `after:2026-08-01`.
@@ -26,6 +26,22 @@ Linktracer is an offline-first personal link library designed to run on a laptop
 - Export and import a portable JSON backup directly from the browser.
 - Install as a PWA on a phone or desktop.
 - No external cloud database is required.
+
+## Personal knowledge system
+
+Linktracer goes beyond bookmark storage by preserving the context around why a link matters:
+
+- **Saved Reader Mode:** retain a readable source excerpt locally so saved research remains useful when the original site is unavailable.
+- **Highlights:** save important passages with an optional note.
+- **Annotations:** attach private notes to a source without changing the original content.
+- **Smart Collections:** persist any search expression as a reusable view.
+- **Knowledge Radar:** a local intelligence layer that surfaces recurring topics, rediscovery candidates and evidence strength.
+- **Deterministic knowledge connections:** links are related using tag overlap, title concepts and domain affinity. No cloud AI or API key is required.
+- **Evidence scoring:** sources receive a transparent score based on captured source context, metadata, health, tags, highlights and annotations rather than an opaque model score.
+- **Rediscovery signals:** older or less recently viewed material is surfaced so valuable research does not disappear into the archive.
+- **Knowledge bundles:** export a focused Markdown bundle containing a source, its context, tags and related saved material.
+
+The goal is a different interaction model from ordinary bookmark managers: **capture once, preserve context, connect what you already know, and rediscover it later.**
 
 ## Stage 1 search and intelligence
 
@@ -41,15 +57,16 @@ The content classifier is deterministic and dependency-free. It uses URL/domain,
 
 ## Design ideas adopted from open-source projects
 
-Linktracer intentionally stays small, but its architecture follows proven patterns from local-first and bookmark-management projects:
+Linktracer intentionally stays small, but its architecture follows proven patterns from local-first and bookmark-management projects. The moat is in combining these ideas around a no-cloud, offline-first knowledge workflow rather than copying a hosted bookmark product.
 
-- **Local-first + durable mutation queue:** the UI writes to IndexedDB first, then syncs in the background. This follows the local-first architecture described by the open-source offline-first PWA/CRDT reference project.
-- **Stable operation IDs and deterministic convergence:** every queued mutation has a client-generated `changeId`; the server acknowledges individual operations and merges fields instead of treating a device as the source of truth.
-- **Monotonic sync cursor:** server changes are tracked with a SQLite sequence so synchronization does not depend on client clocks.
-- **Automatic metadata extraction and tagging:** inspired by Karakeep/Hoarder's automatic title, description and AI-tagging workflow, Linktracer enriches saved URLs without making enrichment a prerequisite for saving.
-- **Preservation and library health:** inspired by Linkwarden and other bookmark managers, Linktracer now detects likely duplicates and checks link health while keeping the core storage lightweight.
+- **Local-first + durable mutation queue:** IndexedDB is the first write target and synchronization is asynchronous.
+- **Stable operation IDs and deterministic convergence:** each queued mutation has a client-generated `changeId`; the server acknowledges individual operations and merges fields instead of treating a device as the source of truth.
+- **Monotonic sync cursor:** SQLite sequence numbers prevent clock-skew sync gaps.
+- **Automatic metadata extraction and tagging:** enrichment is helpful but never blocks capture.
+- **Preservation and library health:** readable context, duplicate detection and health checks make the saved library more trustworthy.
+- **Knowledge graph signals without a graph database:** relationships are derived locally from tags, concepts and domains, keeping deployment simple.
 
-References: [Karakeep/Hoarder](https://github.com/karakeep/hoarder), [Linkwarden](https://github.com/linkwarden/linkwarden), and [offline-first-pwa-crdt-sync](https://github.com/alihamzazaka/offline-first-pwa-crdt-sync).
+Recent open-source systems reinforce the value of this direction: Karakeep combines full-text search, local-model tagging, summaries, highlights and archival; Linklore combines SQLite with hybrid retrieval and private RAG; and local-first knowledge-graph projects expose relationships and agent access without requiring a hosted service.
 
 ## Run on the laptop
 
