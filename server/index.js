@@ -33,6 +33,10 @@ CREATE TABLE IF NOT EXISTS change_log (
   changed_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_change_log_seq ON change_log(seq);
+CREATE TABLE IF NOT EXISTS sync_operations (
+  change_id TEXT PRIMARY KEY,
+  accepted_at INTEGER NOT NULL
+);
 `);
 
 const app = express();
@@ -88,6 +92,8 @@ const get = db.prepare('SELECT * FROM links WHERE canonical_url = ?');
 const insert = db.prepare('INSERT INTO links (id,canonical_url,url,title,descriptions,tags,source_context,created_at,updated_at,revision) VALUES (?,?,?,?,?,?,?,?,?,?)');
 const update = db.prepare('UPDATE links SET url=?,title=?,descriptions=?,tags=?,source_context=?,updated_at=?,revision=revision+1 WHERE canonical_url=?');
 const logChange = db.prepare('INSERT INTO change_log (canonical_url,revision,changed_at) VALUES (?,?,?)');
+const seenOperation = db.prepare('SELECT 1 FROM sync_operations WHERE change_id = ?');
+const recordOperation = db.prepare('INSERT INTO sync_operations (change_id,accepted_at) VALUES (?,?)');
 
 function mergeLink(input, existing, now) {
   const canonicalUrl = canonicalize(input.url || input.canonicalUrl);
@@ -130,8 +136,13 @@ const syncBatch = db.transaction((changes) => {
     const changeId = String(change?.changeId || '');
     try {
       if (!changeId) throw new Error('missing changeId');
+      if (seenOperation.get(changeId)) {
+        acceptedChangeIds.push(changeId);
+        continue;
+      }
       const canonical = canonicalize(change.url || change.canonicalUrl || '');
       merged.push(mergeLink(change, get.get(canonical), Date.now()));
+      recordOperation.run(changeId, Date.now());
       acceptedChangeIds.push(changeId);
     } catch (error) {
       rejectedChanges.push({ changeId, error: error.message || 'invalid change' });
