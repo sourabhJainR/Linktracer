@@ -81,11 +81,14 @@ jobs:
           No Node.js or npm installation is required on the target machine.
           '@ | Set-Content "$bundle/PORTABLE-README.txt"
           Compress-Archive -Path "$bundle/*" -DestinationPath "dist/Linktracer-${{ matrix.name }}.zip" -Force
+      # GitHub Actions artifacts are themselves ZIP archives. Upload the bundle
+      # directory, not the ZIP we create for release distribution, so downloading
+      # an Actions artifact never produces a ZIP-inside-a-ZIP.
       - name: Upload portable bundle
         uses: actions/upload-artifact@v4
         with:
           name: Linktracer-${{ matrix.name }}
-          path: dist/Linktracer-${{ matrix.name }}.zip
+          path: dist/Linktracer-${{ matrix.name }}
           if-no-files-found: error
           retention-days: 30
 
@@ -101,7 +104,17 @@ jobs:
           pattern: Linktracer-*
           path: release-assets
           merge-multiple: true
+      - name: Package release ZIPs
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release-zips
+          for bundle in release-assets/Linktracer-*; do
+            [ -d "$bundle" ] || continue
+            name="$(basename "$bundle")"
+            (cd release-assets && zip -qr "../release-zips/${name}.zip" "$name")
+          done
       - name: Publish release assets
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" release-assets/*.zip --generate-notes --title "Linktracer $GITHUB_REF_NAME"
+        run: gh release create "$GITHUB_REF_NAME" release-zips/*.zip --generate-notes --title "Linktracer $GITHUB_REF_NAME"
