@@ -57,19 +57,39 @@ function autoTags(text) {
   for (const w of words) counts.set(w, (counts.get(w) || 0) + 1);
   return [...counts.entries()].sort((a,b) => b[1]-a[1] || a[0].localeCompare(b[0])).slice(0, 6).map(([w]) => w);
 }
+function htmlToText(html) {
+  return html
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<noscript[\s\S]*?<\/noscript>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
 async function enrich(url) {
   try {
     const response = await fetch(url, { signal: AbortSignal.timeout(7000), headers: { 'user-agent': 'Linktracer/1.0' } });
     const html = (await response.text()).slice(0, 2_000_000);
     const title = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]?.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim() || '';
     const meta = name => {
-      const re = new RegExp(`<meta[^>]+(?:name|property)=["']${name}["'][^>]+content=["']([^"']*)["'][^>]*>`, 'i');
+      const re = new RegExp(`<meta[^>]+(?:name|property)=[\"']${name}[\"'][^>]+content=[\"']([^\"']*)[\"'][^>]*>`, 'i');
       return html.match(re)?.[1]?.trim() || '';
     };
     const description = meta('description') || meta('og:description');
-    return { title, description, site: new URL(url).hostname.replace(/^www\./, ''), status: response.status };
+    const site = new URL(url).hostname.replace(/^www\./, '');
+    const text = htmlToText(html).slice(0, 12000);
+    return {
+      title,
+      description,
+      site,
+      status: response.status,
+      favicon: `${new URL(url).origin}/favicon.ico`,
+      excerpt: text,
+    };
   } catch {
-    return { title: '', description: '', site: new URL(url).hostname.replace(/^www\./, ''), status: 0 };
+    return { title: '', description: '', site: new URL(url).hostname.replace(/^www\./, ''), status: 0, favicon: '', excerpt: '' };
   }
 }
 function parseDescriptions(value) { try { return Array.isArray(value) ? value : JSON.parse(value || '[]'); } catch { return []; } }
@@ -161,7 +181,7 @@ app.post('/api/enrich', async (req, res) => {
   try {
     const url = canonicalize(req.body?.url || '');
     const context = await enrich(url);
-    res.json({ url, ...context, tags: autoTags(`${url} ${context.title} ${context.description}`), enrichedAt: Date.now() });
+    res.json({ url, ...context, tags: autoTags(`${url} ${context.title} ${context.description} ${context.excerpt}`), enrichedAt: Date.now() });
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
 app.get('/api/health', (_req, res) => res.json({ ok: true, time: Date.now() }));
