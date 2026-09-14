@@ -16,7 +16,7 @@ test('classifies a claim as needing independent evidence when it has one hostnam
   const model=buildEvidenceModel([a]);
   assert.equal(model.claims[0].classification,'Needs Independent Evidence');
   assert.equal(model.claims[0].domainCount,1);
-  assert.ok(model.claims[0].actions.some(x=>x.includes('independent source')));
+  assert.ok(model.checklist[0].actions.some(x=>x.includes('independent source')));
 });
 
 test('marks a claim conflicted when supporting and contradicting evidence exist',()=>{
