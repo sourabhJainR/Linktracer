@@ -17,7 +17,6 @@ async function waitForServer() {
   }
   throw new Error('server did not start');
 }
-
 async function sync(changes) {
   return fetch(`http://127.0.0.1:${port}/api/sync`, { method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify({changes}) }).then(r=>r.json());
 }
@@ -33,6 +32,19 @@ test('sync merges tags and distinct descriptions for the same URL without duplic
   assert.match(data.links[0].description,/architecture ideas/);
   assert.match(data.links[0].description,/Useful reference/);
   assert.deepEqual(data.acceptedChangeIds,['c2']);
+});
+
+test('replaying the same operation is acknowledged without creating another merge', async () => {
+  await waitForServer();
+  const change = {changeId:'idempotent-1',url:'https://example.com/idempotent',description:'one note',tags:['one']};
+  const first=await sync([change]);
+  const second=await sync([change]);
+  assert.deepEqual(first.acceptedChangeIds,['idempotent-1']);
+  assert.deepEqual(second.acceptedChangeIds,['idempotent-1']);
+  const pull=await fetch(`http://127.0.0.1:${port}/api/links?cursor=0`).then(r=>r.json());
+  const record=pull.links.find(x=>x.canonicalUrl==='https://example.com/idempotent');
+  assert.equal(record.descriptions.length,1);
+  assert.deepEqual(record.tags,['one']);
 });
 
 test('invalid changes are rejected and remain retryable instead of being silently acknowledged', async () => {
