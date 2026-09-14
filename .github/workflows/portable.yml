@@ -1,0 +1,108 @@
+name: Portable Bundles
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  bundle:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux-x64
+            os: ubuntu-22.04
+          - name: windows-x64
+            os: windows-2022
+          - name: macos-x64
+            os: macos-13
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install production dependencies
+        run: npm install --omit=dev
+      - name: Assemble Unix bundle
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf dist
+          mkdir -p "dist/Linktracer-${{ matrix.name }}/runtime"
+          cp -R public server package.json README.md "dist/Linktracer-${{ matrix.name }}/"
+          cp -R node_modules "dist/Linktracer-${{ matrix.name }}/node_modules"
+          cp scripts/start-linktracer.sh "dist/Linktracer-${{ matrix.name }}/start-linktracer.sh"
+          cp "$(node -p 'process.execPath')" "dist/Linktracer-${{ matrix.name }}/runtime/node"
+          chmod +x "dist/Linktracer-${{ matrix.name }}/start-linktracer.sh" "dist/Linktracer-${{ matrix.name }}/runtime/node"
+          cat > "dist/Linktracer-${{ matrix.name }}/PORTABLE-README.txt" <<'EOF'
+          Linktracer portable bundle
+
+          1. Extract this folder anywhere you want to keep your Linktracer data.
+          2. Run start-linktracer.sh.
+          3. Your browser opens at http://localhost:8787.
+          4. The SQLite database is kept in the data/ folder beside this launcher.
+
+          This bundle includes its own Node.js runtime and production dependencies.
+          No Node.js or npm installation is required on the target machine.
+          EOF
+          cd dist
+          zip -r "Linktracer-${{ matrix.name }}.zip" "Linktracer-${{ matrix.name }}"
+      - name: Assemble Windows bundle
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          if (Test-Path dist) { Remove-Item dist -Recurse -Force }
+          $bundle = "dist/Linktracer-${{ matrix.name }}"
+          New-Item -ItemType Directory -Force "$bundle/runtime" | Out-Null
+          Copy-Item public "$bundle/public" -Recurse
+          Copy-Item server "$bundle/server" -Recurse
+          Copy-Item package.json "$bundle/package.json"
+          Copy-Item README.md "$bundle/README.md"
+          Copy-Item node_modules "$bundle/node_modules" -Recurse
+          Copy-Item scripts/start-linktracer.cmd "$bundle/start-linktracer.cmd"
+          Copy-Item (node -p "process.execPath") "$bundle/runtime/node.exe"
+          @'
+          Linktracer portable bundle
+
+          1. Extract this folder anywhere you want to keep your Linktracer data.
+          2. Double-click start-linktracer.cmd.
+          3. Your browser opens at http://localhost:8787.
+          4. The SQLite database is kept in the data\ folder beside this launcher.
+
+          This bundle includes its own Node.js runtime and production dependencies.
+          No Node.js or npm installation is required on the target machine.
+          '@ | Set-Content "$bundle/PORTABLE-README.txt"
+          Compress-Archive -Path "$bundle/*" -DestinationPath "dist/Linktracer-${{ matrix.name }}.zip" -Force
+      - name: Upload portable bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: Linktracer-${{ matrix.name }}
+          path: dist/Linktracer-${{ matrix.name }}.zip
+          if-no-files-found: error
+          retention-days: 30
+
+  release:
+    name: Publish GitHub release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: bundle
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Download bundles
+        uses: actions/download-artifact@v4
+        with:
+          pattern: Linktracer-*
+          path: release-assets
+          merge-multiple: true
+      - name: Publish release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" release-assets/*.zip --generate-notes --title "Linktracer $GITHUB_REF_NAME"
