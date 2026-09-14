@@ -1,0 +1,9 @@
+{
+  "name": "Linktracer",
+  "short_name": "Linktracer",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#111827",
+  "icons": []
+}
