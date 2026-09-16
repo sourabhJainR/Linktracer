@@ -1,4 +1,4 @@
-const IO_DB='linktracer-local';
+const IO_DB='linktracer-local',IO_DB_VERSION=4;
 const ioEl=id=>document.getElementById(id);
 const ioId=()=>globalThis.crypto?.randomUUID?.()||`${Date.now()}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
 const IO_URL_RE=/https?:\/\/[^\s<>"'`]+/gi;
@@ -6,11 +6,11 @@ const IO_URL_TRAILING=/[),.;!?\]}]+$/g;
 const IO_DATE_RE=/^\s*(?:\[?\s*)?\d{1,4}[\/.-]\d{1,2}[\/.-]\d{2,4}[,\s]+\d{1,2}:\d{2}(?::\d{2})?\s*(?:\]|[-–—])?/;
 let ioSyncInFlight=null;
 function ioReq(r){return new Promise((resolve,reject)=>{r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)})}
-function ioDb(){return new Promise((resolve,reject)=>{const r=indexedDB.open(IO_DB,3);r.onupgradeneeded=()=>{const db=r.result;if(!db.objectStoreNames.contains('links'))db.createObjectStore('links',{keyPath:'canonicalUrl'});if(!db.objectStoreNames.contains('outbox'))db.createObjectStore('outbox',{keyPath:'id',autoIncrement:true});if(!db.objectStoreNames.contains('meta'))db.createObjectStore('meta',{keyPath:'key'});if(!db.objectStoreNames.contains('collections'))db.createObjectStore('collections',{keyPath:'id'})};r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)})}
-async function ioAll(store){const db=await ioDb();return ioReq(db.transaction(store,'readonly').objectStore(store).getAll())}
-async function ioPut(store,value){const db=await ioDb();return ioReq(db.transaction(store,'readwrite').objectStore(store).put(value))}
-async function ioAdd(store,value){const db=await ioDb();return ioReq(db.transaction(store,'readwrite').objectStore(store).add(value))}
-async function ioRemove(store,key){const db=await ioDb();return ioReq(db.transaction(store,'readwrite').objectStore(store).delete(key))}
+function ioDb(){return new Promise((resolve,reject)=>{const r=indexedDB.open(IO_DB,IO_DB_VERSION);r.onupgradeneeded=()=>{const db=r.result;if(!db.objectStoreNames.contains('links'))db.createObjectStore('links',{keyPath:'canonicalUrl'});if(!db.objectStoreNames.contains('outbox'))db.createObjectStore('outbox',{keyPath:'id',autoIncrement:true});if(!db.objectStoreNames.contains('meta'))db.createObjectStore('meta',{keyPath:'key'});if(!db.objectStoreNames.contains('collections'))db.createObjectStore('collections',{keyPath:'id'})};r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error||new Error('Unable to open local database'));r.onblocked=()=>reject(new Error('Local database upgrade is blocked by another Linktracer tab. Close other tabs and retry.'))})}
+async function ioAll(store){const db=await ioDb();try{return await ioReq(db.transaction(store,'readonly').objectStore(store).getAll())}finally{db.close()}}
+async function ioPut(store,value){const db=await ioDb();try{return await ioReq(db.transaction(store,'readwrite').objectStore(store).put(value))}finally{db.close()}}
+async function ioAdd(store,value){const db=await ioDb();try{return await ioReq(db.transaction(store,'readwrite').objectStore(store).add(value))}finally{db.close()}}
+async function ioRemove(store,key){const db=await ioDb();try{return await ioReq(db.transaction(store,'readwrite').objectStore(store).delete(key))}finally{db.close()}}
 function ioCanonicalize(raw){const value=String(raw||'').trim().replace(IO_URL_TRAILING,'');const u=new URL(value);if(!['http:','https:'].includes(u.protocol))throw new Error('Only http and https links are supported');u.hash='';for(const key of [...u.searchParams.keys()])if(/^(utm_|gclid$|fbclid$)/i.test(key))u.searchParams.delete(key);return u.toString().replace(/\/$/,'')}
 function ioHost(url){try{return new URL(url).hostname.replace(/^www\./,'').toLowerCase()}catch{return''}}
 function ioExtractUrls(text){const seen=new Set(),result=[];for(const raw of String(text||'').match(IO_URL_RE)||[]){try{const url=ioCanonicalize(raw);if(!seen.has(url)){seen.add(url);result.push(url)}}catch{}}return result}
