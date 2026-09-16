@@ -8,6 +8,9 @@ import { isConfirmed404, partitionLinks } from '../public/smart-library.js';
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const index = fs.readFileSync(path.join(root, 'public', 'index.html'), 'utf8');
 const smart = fs.readFileSync(path.join(root, 'public', 'smart-library.js'), 'utf8');
+const app = fs.readFileSync(path.join(root, 'public', 'app.js'), 'utf8');
+const io = fs.readFileSync(path.join(root, 'public', 'io.js'), 'utf8');
+const modern = fs.readFileSync(path.join(root, 'public', 'modern.css'), 'utf8');
 
 const link = (url, updatedAt, extra = {}) => ({ canonicalUrl: url, url, updatedAt, ...extra });
 
@@ -41,6 +44,24 @@ test('capture and WhatsApp workspaces are transition panels rather than default 
   assert.match(smart, /section\('Recently added','recent'/);
   assert.match(smart, /section\('Favorites','favorites'/);
   assert.match(smart, /section\('Follow-up','followups'/);
+});
+
+test('successful capture and WhatsApp imports expose a shared focus-and-collapse flow', () => {
+  assert.match(app, /collapseInputWorkspace\(/);
+  assert.match(app, /focusLibrary\(/);
+  assert.match(io, /collapseInputWorkspace\(/);
+  assert.match(io, /focusLibrary\(/);
+  assert.match(io, /ioImportBulkText/);
+});
+
+test('library supports persisted list and grid display modes', () => {
+  assert.match(index, /id=["']layoutListBtn["']/);
+  assert.match(index, /id=["']layoutGridBtn["']/);
+  assert.match(app, /linktracer-layout/);
+  assert.match(app, /setLibraryLayout\(/);
+  assert.match(app, /data-layout=/);
+  assert.match(modern, /\.libraryList/);
+  assert.match(modern, /\.layoutToggle/);
 });
 
 test('confirmed 404 cleanup uses a deletion change that can be synchronized', () => {
