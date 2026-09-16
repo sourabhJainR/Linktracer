@@ -1,9 +1,9 @@
 const DB='linktracer-local',STORE='collections',OUTBOX='outbox',META='meta',PREFIX='category:';
-const open=()=>new Promise((resolve,reject)=>{const r=indexedDB.open(DB,3);r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)});
+const open=()=>new Promise((resolve,reject)=>{const r=indexedDB.open(DB,5);r.onsuccess=()=>{const db=r.result;db.onversionchange=()=>db.close();resolve(db)};r.onerror=()=>reject(r.error)});
 const req=r=>new Promise((resolve,reject)=>{r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)});
-const all=s=>open().then(db=>req(db.transaction(s).objectStore(s).getAll()));
-const put=(s,v)=>open().then(db=>req(db.transaction(s,'readwrite').objectStore(s).put(v)));
-const remove=(s,id)=>open().then(db=>req(db.transaction(s,'readwrite').objectStore(s).delete(id)));
+const all=s=>open().then(db=>req(db.transaction(s).objectStore(s).getAll()).finally(()=>db.close()));
+const put=(s,v)=>open().then(db=>req(db.transaction(s,'readwrite').objectStore(s).put(v)).finally(()=>db.close()));
+const remove=(s,id)=>open().then(db=>req(db.transaction(s,'readwrite').objectStore(s).delete(id)).finally(()=>db.close()));
 const device=()=>localStorage.getItem('linktracer-device')||'';
 const rows=xs=>xs.filter(x=>String(x.id||'').startsWith(PREFIX));
 const merge=(a,b)=>{if(!a)return b;return Number(b.updatedAt||0)>=Number(a.updatedAt||0)?{...a,...b}:{...b,...a,updatedAt:Math.max(Number(a.updatedAt||0),Number(b.updatedAt||0))}};
