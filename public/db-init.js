@@ -13,8 +13,14 @@ function ensureLinktracerStores(db){
   }
 }
 
+const nativeIndexedDbOpen=indexedDB.open.bind(indexedDB);
+indexedDB.open=(name,version,...rest)=>{
+  if(name===LINKTRACER_DB&&(version==null||version<LINKTRACER_DB_VERSION))return nativeIndexedDbOpen(name,LINKTRACER_DB_VERSION,...rest);
+  return nativeIndexedDbOpen(name,version,...rest);
+};
+
 window.LinktracerDbReady=new Promise((resolve,reject)=>{
-  const request=indexedDB.open(LINKTRACER_DB,LINKTRACER_DB_VERSION);
+  const request=nativeIndexedDbOpen(LINKTRACER_DB,LINKTRACER_DB_VERSION);
   request.onupgradeneeded=()=>ensureLinktracerStores(request.result);
   request.onsuccess=()=>{
     const db=request.result;
