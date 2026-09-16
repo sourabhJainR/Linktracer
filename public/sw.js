@@ -1,4 +1,4 @@
-const CACHE='linktracer-v8';
+const CACHE='linktracer-v9';
 const APP=['/','/index.html','/styles.css?v=20260916-2','/modern.css?v=20260916-2','/app.js?v=20260916-2','/moat.js?v=20260916-2','/gaps.js?v=20260916-2','/confidence.js?v=20260916-2','/research.js?v=20260916-2','/research-sync.js?v=20260916-2','/category-sync.js?v=20260916-2','/category-tabs.js?v=20260916-2','/db-init.js?v=20260916-2','/io.js?v=20260916-2','/manifest.webmanifest'];
 self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(APP)).then(()=>self.skipWaiting())));
 self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
