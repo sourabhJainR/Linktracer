@@ -1,9 +1,9 @@
 const DB='linktracer-local',STORE='collections',OUTBOX='outbox',META='meta',PREFIX='research-session:';
-const open=()=>new Promise((resolve,reject)=>{const r=indexedDB.open(DB,3);r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)});
+const open=()=>new Promise((resolve,reject)=>{const r=indexedDB.open(DB,5);r.onsuccess=()=>{const db=r.result;db.onversionchange=()=>db.close();resolve(db)};r.onerror=()=>reject(r.error)});
 const req=r=>new Promise((resolve,reject)=>{r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)});
-const all=s=>open().then(db=>req(db.transaction(s).objectStore(s).getAll()));
-const put=(s,v)=>open().then(db=>req(db.transaction(s,'readwrite').objectStore(s).put(v)));
-const remove=(s,id)=>open().then(db=>req(db.transaction(s,'readwrite').objectStore(s).delete(id)));
+const all=s=>open().then(db=>req(db.transaction(s).objectStore(s).getAll()).finally(()=>db.close()));
+const put=(s,v)=>open().then(db=>req(db.transaction(s,'readwrite').objectStore(s).put(v)).finally(()=>db.close()));
+const remove=(s,id)=>open().then(db=>req(db.transaction(s,'readwrite').objectStore(s).delete(id)).finally(()=>db.close()));
 const now=()=>Date.now();
 const device=()=>{let id=localStorage.getItem('linktracer-device');if(!id){id=crypto.randomUUID();localStorage.setItem('linktracer-device',id)}return id};
 const sessionRows=rows=>rows.filter(x=>String(x.id||'').startsWith(PREFIX));
