@@ -1,5 +1,8 @@
 const CONFIG_KEY = 'linktracer-ai-config';
-const DEFAULT_CONFIG = { enabled: false, endpoint: '/api/ai', model: 'default' };
+const DB_NAME = 'linktracer-local';
+const DB_VERSION = 6;
+const DEFAULT_CONFIG = { enabled: false, endpoint: '', model: 'default' };
+let selectedLink = null;
 
 export function aiAssistConfig(overrides = {}) {
   const stored = typeof localStorage !== 'undefined' ? localStorage.getItem(CONFIG_KEY) : null;
@@ -29,6 +32,7 @@ export function validateAIResponse(response) {
 export async function enrichLink(link, overrides = {}) {
   const config = aiAssistConfig(overrides);
   if (!config.enabled) throw new Error('AI assistance is disabled; enable it explicitly first.');
+  if (!config.endpoint) throw new Error('Configure an AI provider endpoint before enriching.');
   const payload = sanitizeForAI(link);
   const response = await fetch(config.endpoint, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ model: config.model, input: payload }) });
   if (!response.ok) throw new Error(`AI provider returned ${response.status}`);
@@ -41,14 +45,46 @@ export function setAIConfig(config) {
   return next;
 }
 
+function openDb() { return new Promise((resolve, reject) => { const request = indexedDB.open(DB_NAME, DB_VERSION); request.onsuccess = () => { const db = request.result; db.onversionchange = () => db.close(); resolve(db); }; request.onerror = () => reject(request.error || new Error('Unable to open local database')); }); }
+async function readLink(canonicalUrl) { const db = await openDb(); try { return await new Promise((resolve, reject) => { const request = db.transaction('links', 'readonly').objectStore('links').get(canonicalUrl); request.onsuccess = () => resolve(request.result || null); request.onerror = () => reject(request.error); }); } finally { db.close(); } }
+async function persistEnrichment(link, enrichment) {
+  const db = await openDb();
+  const updated = { ...link, sourceContext: { ...(link.sourceContext || {}), ai: { ...enrichment, enrichedAt: Date.now(), provider: aiAssistConfig().model } }, updatedAt: Date.now() };
+  try {
+    await new Promise((resolve, reject) => { const request = db.transaction('links', 'readwrite').objectStore('links').put(updated); request.onsuccess = resolve; request.onerror = () => reject(request.error); });
+    await new Promise((resolve, reject) => { const request = db.transaction('outbox', 'readwrite').objectStore('outbox').add({ ...updated, changeId: globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`, deviceId: localStorage.getItem('linktracer-device') || 'ai-assist', queuedAt: Date.now() }); request.onsuccess = resolve; request.onerror = () => reject(request.error); });
+  } finally { db.close(); }
+  window.LinktracerIO?.sync?.();
+  window.LinktracerSmartLibrary?.refresh?.();
+  document.dispatchEvent(new CustomEvent('linktracer-ai-enriched', { detail: updated }));
+  return updated;
+}
+
+export function selectLink(link) { selectedLink = link ? sanitizeForAI(link) : null; return selectedLink; }
+
+async function enrichSelected(status) {
+  if (!selectedLink?.url) throw new Error('Select a source first.');
+  const full = await readLink(selectedLink.url);
+  if (!full) throw new Error('Selected source is no longer in the local library.');
+  status.textContent = 'Calling the configured provider…';
+  const enrichment = await enrichLink(full);
+  await persistEnrichment(full, enrichment);
+  status.textContent = 'Enrichment saved locally and queued for sync.';
+}
+
+function escapeAttr(value) { return String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 function render() {
   const root = document.getElementById('aiAssist');
   if (!root) return;
   const config = aiAssistConfig();
-  root.innerHTML = `<div class="aiAssistHeader"><div><span class="eyebrow">OPTIONAL AI</span><strong>AI-assisted enrichment</strong><small>Off by default. No background AI calls.</small></div><label class="aiToggle"><input id="aiEnabled" type="checkbox" ${config.enabled ? 'checked' : ''}><span>Enable</span></label></div><div class="aiAssistForm"><label>Provider endpoint<input id="aiEndpoint" value="${config.endpoint.replace(/\"/g,'&quot;')}" inputmode="url"></label><label>Model<input id="aiModel" value="${config.model.replace(/\"/g,'&quot;')}"></label><button id="aiSave" type="button">Save settings</button><button id="aiEnrich" type="button" class="subtle" ${config.enabled ? '' : 'disabled'}>Enrich selected source</button></div><p id="aiStatus" class="hint">${config.enabled ? 'AI is enabled. Enrichment is still manual and per-source.' : 'AI is disabled. Enable it to use a configured provider.'}</p>`;
-  root.querySelector('#aiSave').onclick = () => { const next = setAIConfig({ enabled: root.querySelector('#aiEnabled').checked, endpoint: root.querySelector('#aiEndpoint').value.trim() || DEFAULT_CONFIG.endpoint, model: root.querySelector('#aiModel').value.trim() || DEFAULT_CONFIG.model }); render(); if (next.enabled) root.querySelector('#aiStatus').textContent = 'AI is enabled. Select a source and use Enrich when you want an external AI call.'; };
-  root.querySelector('#aiEnabled').onchange = () => { root.querySelector('#aiEnrich').disabled = !root.querySelector('#aiEnabled').checked; };
-  root.querySelector('#aiEnrich').onclick = () => { root.querySelector('#aiStatus').textContent = 'Manual enrichment is ready; select a source in the library first.'; };
+  root.innerHTML = `<div class="aiAssistHeader"><div><span class="eyebrow">OPTIONAL AI</span><strong>AI-assisted enrichment</strong><small>Off by default. No background AI calls. Only the selected source is sent.</small></div><label class="aiToggle"><input id="aiEnabled" type="checkbox" ${config.enabled ? 'checked' : ''}><span>Enable</span></label></div><div class="aiAssistForm"><label>Provider endpoint<input id="aiEndpoint" value="${escapeAttr(config.endpoint)}" inputmode="url" placeholder="https://your-provider.example/enrich"></label><label>Model<input id="aiModel" value="${escapeAttr(config.model)}"></label><button id="aiSave" type="button">Save settings</button><button id="aiEnrich" type="button" class="subtle" ${config.enabled && selectedLink ? '' : 'disabled'}>Enrich selected source</button></div><p id="aiStatus" class="hint">${selectedLink ? `Selected: ${selectedLink.title || selectedLink.url}` : 'Select a source from the library to begin.'}</p>`;
+  root.querySelector('#aiSave').onclick = () => { setAIConfig({ enabled: root.querySelector('#aiEnabled').checked, endpoint: root.querySelector('#aiEndpoint').value.trim(), model: root.querySelector('#aiModel').value.trim() || DEFAULT_CONFIG.model }); render(); };
+  root.querySelector('#aiEnabled').onchange = () => { root.querySelector('#aiEnrich').disabled = !root.querySelector('#aiEnabled').checked || !selectedLink; };
+  root.querySelector('#aiEnrich').onclick = async () => { const status = root.querySelector('#aiStatus'); root.querySelector('#aiEnrich').disabled = true; try { await enrichSelected(status); } catch (error) { status.textContent = error.message; } finally { root.querySelector('#aiEnrich').disabled = !aiAssistConfig().enabled || !selectedLink; } };
 }
 
-if (typeof window !== 'undefined') { window.LinktracerAI = { aiAssistConfig, sanitizeForAI, validateAIResponse, enrichLink, setAIConfig }; window.addEventListener('load', render); }
+if (typeof window !== 'undefined') {
+  window.LinktracerAI = { aiAssistConfig, sanitizeForAI, validateAIResponse, enrichLink, setAIConfig, selectLink };
+  window.addEventListener('linktracer-ai-select', event => { selectedLink = event.detail?.link ? sanitizeForAI(event.detail.link) : null; render(); document.getElementById('aiAssist')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); });
+  window.addEventListener('load', render);
+}
