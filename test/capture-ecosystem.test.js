@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { extractSharedUrl, queryCapture } from '../public/capture-ecosystem.js';
+import { bookmarkletCode, extractSharedUrl, queryCapture } from '../public/capture-ecosystem.js';
 
 const index = fs.readFileSync('public/index.html', 'utf8');
 const manifest = fs.readFileSync('public/manifest.webmanifest', 'utf8');
@@ -32,9 +32,10 @@ test('capture shell handles shared and bookmarklet query parameters', () => {
 });
 
 test('bookmarklet is generated for the current Linktracer origin without external dependencies', () => {
-  assert.match(capture, /javascript:/);
-  assert.match(capture, /location\.origin/);
-  assert.match(capture, /encodeURIComponent/);
+  const code = bookmarkletCode('http://localhost:8787');
+  assert.match(code, /^javascript:/);
+  assert.match(code, /http:\\/\\/localhost:8787/);
+  assert.match(code, /encodeURIComponent/);
   assert.match(capture, /navigator\.clipboard/);
 });
 
