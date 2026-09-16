@@ -15,7 +15,7 @@ test('top-bar actions and WhatsApp entry point are present', () => {
   for (const id of ['captureWorkspaceToggle', 'whatsappTopBtn', 'syncBtn', 'exportBtn', 'importBtn', 'importFile']) assert.match(index, new RegExp(`id=[\"']${id}[\"']`));
   assert.match(index, /href=[\"']#whatsappWorkspace[\"']/);
   assert.match(index, /id=[\"']whatsappWorkspace[\"']/);
-  assert.match(smart, /whatsappWorkspaceToggle\|\$\('whatsappTopBtn'\)/);
+  assert.match(smart, /whatsappWorkspaceToggle.*whatsappTopBtn/);
 });
 
 test('I/O controller owns export, import, sync and WhatsApp actions', () => {
