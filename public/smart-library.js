@@ -125,7 +125,8 @@ function togglePanel(id){
 
 function wirePanels(){
   $('captureWorkspaceToggle')?.addEventListener('click',()=>togglePanel('captureWorkspace'));
-  $('whatsappWorkspaceToggle')?.addEventListener('click',()=>togglePanel('whatsappWorkspace'));
+  const whatsappToggle=$('whatsappWorkspaceToggle')||$('whatsappTopBtn');
+  whatsappToggle?.addEventListener('click',event=>{if(whatsappToggle.id==='whatsappTopBtn')event.preventDefault();togglePanel('whatsappWorkspace')});
 }
 
 function wireSmartActions(){
@@ -171,5 +172,7 @@ function init(){
   refreshSmart();
 }
 
-if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
-window.LinktracerSmartLibrary={refresh:refreshSmart,isConfirmed404,partitionLinks};
+if(typeof document!=='undefined'){
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
+  window.LinktracerSmartLibrary={refresh:refreshSmart,isConfirmed404,partitionLinks};
+}
