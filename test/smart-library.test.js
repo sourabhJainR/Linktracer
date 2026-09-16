@@ -19,7 +19,7 @@ test('smart library keeps recent, favorites and follow-up links as separate view
     link('https://new.example', 500)
   ]);
 
-  assert.deepEqual(result.recent.map(x => x.url), ['https://new.example', 'https://followup.example', 'https://favorite.example']);
+  assert.deepEqual(result.recent.map(x => x.url), ['https://new.example', 'https://followup.example', 'https://favorite.example', 'https://old.example']);
   assert.deepEqual(result.favorites.map(x => x.url), ['https://favorite.example']);
   assert.deepEqual(result.followUps.map(x => x.url), ['https://followup.example']);
   assert.equal(result.all.length, 4);
@@ -38,9 +38,9 @@ test('capture and WhatsApp workspaces are transition panels rather than default 
   assert.match(index, /id=["']captureWorkspace["']/);
   assert.match(index, /id=["']whatsappWorkspace["']/);
   assert.match(smart, /togglePanel\(/);
-  assert.match(smart, /data-smart-section=["']recent["']/);
-  assert.match(smart, /data-smart-section=["']favorites["']/);
-  assert.match(smart, /data-smart-section=["']followups["']/);
+  assert.match(smart, /section\('Recently added','recent'/);
+  assert.match(smart, /section\('Favorites','favorites'/);
+  assert.match(smart, /section\('Follow-up','followups'/);
 });
 
 test('confirmed 404 cleanup uses a deletion change that can be synchronized', () => {
