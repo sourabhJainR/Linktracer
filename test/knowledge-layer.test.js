@@ -55,5 +55,6 @@ test('knowledge UI uses the shared engine and current IndexedDB schema', () => {
   assert.match(ui, /linktracer-local/);
   assert.match(ui, /indexedDB\.open\(DB_NAME, DB_VERSION\)/);
   assert.match(ui, /const DB_VERSION = 6/);
+  assert.doesNotMatch(ui, /store\.put\(/);
   assert.match(index, /knowledge-ui\.js\?v=/);
 });
