@@ -1,0 +1,11 @@
+{
+  "manifest_version": 3,
+  "name": "Linktracer Capture",
+  "version": "1.0.0",
+  "description": "Capture the current page into a Linktracer server.",
+  "permissions": ["tabs", "storage"],
+  "action": {
+    "default_title": "Save to Linktracer",
+    "default_popup": "popup.html"
+  }
+}
