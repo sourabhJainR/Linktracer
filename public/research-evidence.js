@@ -1,9 +1,9 @@
 import { buildEvidenceModel, normalizeClaim } from './confidence-engine.js';
 const DB='linktracer-local',STORE='collections',LINKS='links',OUTBOX='outbox',PREFIX='research-session:';
-const open=()=>new Promise((resolve,reject)=>{const r=indexedDB.open(DB,6);r.onsuccess=()=>{const db=r.result;db.onversionchange=()=>db.close();resolve(db)};r.onerror=()=>reject(r.error)});
+const open=()=>new Promise((resolve,reject)=>{const r=indexedDB.open(DB,3);r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)});
 const req=r=>new Promise((a,b)=>{r.onsuccess=()=>a(r.result);r.onerror=()=>b(r.error)});
-const all=s=>open().then(async db=>{try{return await req(db.transaction(s).objectStore(s).getAll())}finally{db.close()}});
-const put=(s,v)=>open().then(async db=>{try{return await req(db.transaction(s,'readwrite').objectStore(s).put(v))}finally{db.close()}});
+const all=s=>open().then(db=>req(db.transaction(s).objectStore(s).getAll()));
+const put=(s,v)=>open().then(db=>req(db.transaction(s,'readwrite').objectStore(s).put(v)));
 const esc=v=>String(v??'').replace(/[&<>\"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[c]));
 const now=()=>Date.now();
 const sessions=rows=>rows.filter(x=>String(x.id||'').startsWith(PREFIX));

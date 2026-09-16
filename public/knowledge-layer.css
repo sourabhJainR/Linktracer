@@ -1,6 +1,0 @@
-.knowledgeHealth{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.75rem;margin-top:1rem;padding:1rem;border:1px solid var(--border,#dbe3ef);border-radius:14px;background:var(--surface,#fff)}
-.knowledgeHealth>div{display:flex;flex-direction:column;gap:.15rem;min-width:0}
-.knowledgeHealth strong{font-size:1.2rem;line-height:1.1}
-.knowledgeHealth small{color:var(--muted,#64748b)}
-.knowledgeHealth .hint{grid-column:1/-1;margin:0}
-@media(max-width:640px){.knowledgeHealth{grid-template-columns:1fr 1fr}.knowledgeHealth .hint{grid-column:1/-1}}
