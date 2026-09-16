@@ -9,6 +9,7 @@ const read = file => fs.readFileSync(path.join(root, file), 'utf8');
 const index = read('public/index.html');
 const app = read('public/app.js');
 const io = read('public/io.js');
+const dbInit = read('public/db-init.js');
 const researchSync = read('public/research-sync.js');
 const sw = read('public/sw.js');
 
@@ -38,9 +39,20 @@ test('sync and background enrichment have explicit in-flight protection', () => 
   assert.match(app, /enrichInFlight/);
 });
 
+test('local database bootstrap runs before application storage access', () => {
+  assert.match(index, /db-init\.js\?v=/);
+  assert.ok(index.indexOf('db-init.js') < index.indexOf('app.js'), 'database bootstrap must load before app.js');
+  assert.match(dbInit, /LINKTRACER_DB_VERSION=5/);
+  assert.match(dbInit, /links/);
+  assert.match(dbInit, /outbox/);
+  assert.match(dbInit, /meta/);
+  assert.match(dbInit, /collections/);
+});
+
 test('service worker and index use the same cache-busting revision', () => {
   assert.ok(version, 'index stylesheet revision should exist');
   assert.match(sw, new RegExp(`styles\\.css\\?v=${version}`));
   assert.match(sw, new RegExp(`app\\.js\\?v=${version}`));
   assert.match(sw, new RegExp(`io\\.js\\?v=${version}`));
+  assert.match(sw, new RegExp(`db-init\\.js\\?v=${version}`));
 });
