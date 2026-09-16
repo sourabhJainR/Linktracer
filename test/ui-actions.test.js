@@ -8,7 +8,7 @@ const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const index = fs.readFileSync(path.join(root, 'public', 'index.html'), 'utf8');
 const io = fs.readFileSync(path.join(root, 'public', 'io.js'), 'utf8');
 const sw = fs.readFileSync(path.join(root, 'public', 'sw.js'), 'utf8');
-const version = '20260916-2';
+const version = index.match(/styles\.css\?v=([^"']+)/)?.[1];
 
 test('top-bar actions and WhatsApp entry point are present', () => {
   for (const id of ['whatsappTopBtn', 'syncBtn', 'exportBtn', 'importBtn', 'importFile']) assert.match(index, new RegExp(`id=[\"']${id}[\"']`));
@@ -27,7 +27,8 @@ test('I/O controller owns export, import, sync and WhatsApp actions', () => {
 });
 
 test('browser assets use a cache-busting revision and matching service-worker cache', () => {
+  assert.ok(version, 'index stylesheet revision should exist');
   for(const asset of ['app.js','io.js','modern.css']) assert.match(index,new RegExp(`${asset}\\?v=${version}`));
-  assert.match(sw,/CACHE='linktracer-v9'/);
+  assert.match(sw,/CACHE='linktracer-v10'/);
   for(const asset of ['app.js','io.js','modern.css']) assert.match(sw,new RegExp(`${asset}\\?v=${version}`));
 });
