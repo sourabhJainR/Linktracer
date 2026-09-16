@@ -2,8 +2,8 @@ import express from 'express';
 import Database from 'better-sqlite3';
 import { randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync } from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(__dirname, '..');
@@ -36,6 +36,6 @@ app.get('/api/preservation',async(req,res)=>{try{const url=canonicalize(req.quer
 const syncBatch=db.transaction(changes=>{const merged=[],acceptedChangeIds=[],rejectedChanges=[];for(const change of changes){const changeId=String(change?.changeId||'');try{if(!changeId)throw Error('missing changeId');if(seenOperation.get(changeId)){acceptedChangeIds.push(changeId);continue}if(change.entityType==='collection'){const id=String(change.collection?.id||change.id||'');if(!id)throw Error('missing collection id');if(change.deleted){deleteCollection(id,Date.now());merged.push({id,deleted:true})}else{const existing=db.prepare('SELECT * FROM collections WHERE id=?').get(id);merged.push(mergeCollection(change.collection||change,existing,Date.now()))}recordOperation.run(changeId,Date.now());acceptedChangeIds.push(changeId);continue}if(change.entityType==='link'){const canonical=canonicalize(change.url||change.canonicalUrl||'');if(change.deleted){deleteLink(canonical,Date.now());merged.push({canonicalUrl:canonical,deleted:true})}else merged.push(mergeLink(change,get.get(canonical),Date.now()));recordOperation.run(changeId,Date.now());acceptedChangeIds.push(changeId);continue}const canonical=canonicalize(change.url||change.canonicalUrl||'');merged.push(mergeLink(change,get.get(canonical),Date.now()));recordOperation.run(changeId,Date.now());acceptedChangeIds.push(changeId)}catch(error){rejectedChanges.push({changeId,error:error.message||'invalid change'})}}return{merged,acceptedChangeIds,rejectedChanges}});
 app.post('/api/sync',(req,res)=>{const changes=Array.isArray(req.body?.changes)?req.body.changes:[],result=syncBatch(changes);res.json({...result,links:result.merged.filter(x=>x?.url&&!x?.deleted),collections:result.merged.filter(x=>x?.id&&!x?.url),serverTime:Date.now()})});
 app.post('/api/enrich',async(req,res)=>{try{const url=canonicalize(req.body?.url||''),context=await enrich(url);res.json({url,...context,tags:autoTags(`${url} ${context.title} ${context.description} ${context.excerpt}`),enrichedAt:Date.now()})}catch(e){res.status(400).json({error:e.message})}});
-app.post('/api/link-health',async(req,res)=>{try{const url=canonicalize(req.body?.url||'');res.json({url,...(await checkHealth(url))})}catch(e){res.status(400).json({error:e.message})});
+app.post('/api/link-health',async(req,res)=>{try{const url=canonicalize(req.body?.url||'');res.json({url,...(await checkHealth(url))})}catch(e){res.status(400).json({error:e.message})}});
 app.get('/api/health',(_req,res)=>res.json({ok:true,time:Date.now()}));app.get('*splat',(_req,res)=>res.sendFile(path.join(root,'public','index.html')));
 const port=Number(process.env.PORT||8787);app.listen(port,'0.0.0.0',()=>console.log(`Linktracer running at http://localhost:${port}`));
