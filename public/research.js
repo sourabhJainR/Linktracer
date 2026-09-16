@@ -2,10 +2,10 @@ const DB='linktracer-local';
 const STORE='collections';
 const SESSION_PREFIX='research-session:';
 const esc=v=>String(v??'').replace(/[&<>\"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[c]));
-const open=()=>new Promise((resolve,reject)=>{const r=indexedDB.open(DB,3);r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)});
-const all=()=>open().then(db=>new Promise((resolve,reject)=>{const r=db.transaction(STORE).objectStore(STORE).getAll();r.onsuccess=()=>resolve(r.result||[]);r.onerror=()=>reject(r.error)}));
-const put=v=>open().then(db=>new Promise((resolve,reject)=>{const r=db.transaction(STORE,'readwrite').objectStore(STORE).put(v);r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)}));
-const remove=id=>open().then(db=>new Promise((resolve,reject)=>{const r=db.transaction(STORE,'readwrite').objectStore(STORE).delete(id);r.onsuccess=()=>resolve();r.onerror=()=>reject(r.error)}));
+const open=()=>new Promise((resolve,reject)=>{const r=indexedDB.open(DB,5);r.onsuccess=()=>{const db=r.result;db.onversionchange=()=>db.close();resolve(db)};r.onerror=()=>reject(r.error)});
+const all=()=>open().then(db=>new Promise((resolve,reject)=>{const r=db.transaction(STORE).objectStore(STORE).getAll();r.onsuccess=()=>{const result=r.result||[];db.close();resolve(result)};r.onerror=()=>{db.close();reject(r.error)}}));
+const put=v=>open().then(db=>new Promise((resolve,reject)=>{const r=db.transaction(STORE,'readwrite').objectStore(STORE).put(v);r.onsuccess=()=>{const result=r.result;db.close();resolve(result)};r.onerror=()=>{db.close();reject(r.error)}}));
+const remove=id=>open().then(db=>new Promise((resolve,reject)=>{const r=db.transaction(STORE,'readwrite').objectStore(STORE).delete(id);r.onsuccess=()=>{db.close();resolve()};r.onerror=()=>{db.close();reject(r.error)}}));
 const now=()=>Date.now();
 function sessions(rows){return rows.filter(x=>String(x.id||'').startsWith(SESSION_PREFIX));}
 function daysUntil(ts){if(!ts)return null;return Math.ceil((ts-Date.now())/86400000)}
