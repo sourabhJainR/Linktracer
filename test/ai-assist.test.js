@@ -16,10 +16,15 @@ test('AI responses require bounded structured fields', () => {
 test('AI is disabled by default and requires explicit opt-in', () => {
   const config = aiAssistConfig({});
   assert.equal(config.enabled, false);
-  assert.equal(config.endpoint, '/api/ai');
+  assert.equal(config.endpoint, '');
   const ui = fs.readFileSync('public/ai-assist.js', 'utf8');
   const index = fs.readFileSync('public/index.html', 'utf8');
+  const smart = fs.readFileSync('public/smart-library.js', 'utf8');
   assert.match(ui, /enabled.*false/);
   assert.match(ui, /explicit/i);
+  assert.match(ui, /outbox/);
+  assert.match(ui, /selectLink/);
   assert.match(index, /ai-assist\.js\?v=/);
+  assert.match(smart, /data-smart-action=\"ai\"/);
+  assert.match(smart, /linktracer-ai-select/);
 });
