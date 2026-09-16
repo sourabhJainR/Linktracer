@@ -8,9 +8,7 @@ import { isConfirmed404, partitionLinks } from '../public/smart-library.js';
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const index = fs.readFileSync(path.join(root, 'public', 'index.html'), 'utf8');
 const smart = fs.readFileSync(path.join(root, 'public', 'smart-library.js'), 'utf8');
-const app = fs.readFileSync(path.join(root, 'public', 'app.js'), 'utf8');
-const io = fs.readFileSync(path.join(root, 'public', 'io.js'), 'utf8');
-const modern = fs.readFileSync(path.join(root, 'public', 'modern.css'), 'utf8');
+const libraryUi = fs.readFileSync(path.join(root, 'public', 'library-ui.js'), 'utf8');
 
 const link = (url, updatedAt, extra = {}) => ({ canonicalUrl: url, url, updatedAt, ...extra });
 
@@ -46,22 +44,23 @@ test('capture and WhatsApp workspaces are transition panels rather than default 
   assert.match(smart, /section\('Follow-up','followups'/);
 });
 
-test('successful capture and WhatsApp imports expose a shared focus-and-collapse flow', () => {
-  assert.match(app, /collapseInputWorkspace\(/);
-  assert.match(app, /focusLibrary\(/);
-  assert.match(io, /collapseInputWorkspace\(/);
-  assert.match(io, /focusLibrary\(/);
-  assert.match(io, /ioImportBulkText/);
+test('successful input completion collapses the active workspace and returns focus to the library', () => {
+  assert.match(libraryUi, /collapseInputWorkspace\(/);
+  assert.match(libraryUi, /focusAfterImport\(/);
+  assert.match(libraryUi, /focusLibrary\(/);
+  assert.match(libraryUi, /smartPanelOpen/);
+  assert.match(libraryUi, /captureForm/);
+  assert.match(libraryUi, /whatsappImportBtn/);
+  assert.match(libraryUi, /importFile/);
 });
 
 test('library supports persisted list and grid display modes', () => {
-  assert.match(index, /id=["']layoutListBtn["']/);
-  assert.match(index, /id=["']layoutGridBtn["']/);
-  assert.match(app, /linktracer-layout/);
-  assert.match(app, /setLibraryLayout\(/);
-  assert.match(app, /data-layout=/);
-  assert.match(modern, /\.libraryList/);
-  assert.match(modern, /\.layoutToggle/);
+  assert.match(libraryUi, /linktracer-layout/);
+  assert.match(libraryUi, /setLayout\(/);
+  assert.match(libraryUi, /data-library-layout="list"/);
+  assert.match(libraryUi, /data-library-layout="grid"/);
+  assert.match(libraryUi, /libraryList/);
+  assert.match(libraryUi, /layoutToggle/);
 });
 
 test('confirmed 404 cleanup uses a deletion change that can be synchronized', () => {
