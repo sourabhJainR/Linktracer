@@ -49,9 +49,9 @@ test('local database bootstrap is durable and shared at version 6', () => {
   for(const store of ['links','outbox','meta','collections'])assert.match(dbInit,new RegExp(store));
   assert.match(dbInit, /indexedDB\.open=\(name,version/);
   assert.match(dbInit, /version<LINKTRACER_DB_VERSION/);
-  assert.match(app, /DB_VERSION=5/);
+  assert.match(app, /DB_VERSION=6/);
   assert.match(io, /IO_DB_VERSION=6/);
-  assert.match(researchSync, /indexedDB\.open\(DB,5\)/);
+  assert.match(researchSync, /indexedDB\.open\(DB,6\)/);
   assert.match(categorySync, /indexedDB\.open\(DB,6\)/);
 });
 
@@ -61,7 +61,7 @@ test('local link writes are queued before any network sync', () => {
 });
 
 test('server stores application data on disk so restart does not reset links', () => {
-  assert.match(server, /new Database\(process\.env\.LINKTRACER_DB \|\| path\.join\(dataDir,'linktracer\.db'\)\)/);
+  assert.match(server, /new Database\(process\.env\.LINKTRACER_DB\s*\|\|\s*path\.join\(dataDir,\s*['"]linktracer\.db['"]\)\)/);
   assert.match(server, /journal_mode = WAL/);
   assert.match(server, /CREATE TABLE IF NOT EXISTS links/);
 });
