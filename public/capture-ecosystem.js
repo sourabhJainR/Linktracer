@@ -1,14 +1,20 @@
-const DEFAULT_ENDPOINT = `${location.origin}/`;
+const runtimeLocation = typeof location !== 'undefined' ? location : { origin: '', search: '' };
+const DEFAULT_ENDPOINT = runtimeLocation.origin ? `${runtimeLocation.origin}/` : '';
 
 function safeValue(value) {
   return String(value || '').trim().slice(0, 4000);
 }
 
-function queryCapture() {
-  const params = new URLSearchParams(location.search);
-  const url = safeValue(params.get('url'));
-  const title = safeValue(params.get('title'));
+function extractSharedUrl(text) {
+  const match = safeValue(text).match(/https?:\/\/[^\s<>'"`]+/i);
+  return match ? match[0].replace(/[),.;!?]+$/, '') : '';
+}
+
+function queryCapture(search = runtimeLocation.search) {
+  const params = new URLSearchParams(search || '');
   const text = safeValue(params.get('text'));
+  const url = safeValue(params.get('url')) || extractSharedUrl(text);
+  const title = safeValue(params.get('title'));
   return { url, title, text };
 }
 
@@ -30,8 +36,8 @@ function fillCaptureForm(capture) {
   return true;
 }
 
-function bookmarkletCode() {
-  const target = `${location.origin}/`;
+function bookmarkletCode(origin = runtimeLocation.origin) {
+  const target = `${origin}/`;
   const script = `const u=location.href,t=document.title,s=(window.getSelection&&String(window.getSelection()))||'';location.href=${JSON.stringify(target)}+'?url='+encodeURIComponent(u)+'&title='+encodeURIComponent(t)+'&text='+encodeURIComponent(s.slice(0,4000))`;
   return `javascript:(()=>{${script}})()`;
 }
@@ -80,12 +86,12 @@ function render() {
 }
 
 function cleanQuery() {
-  const params = new URLSearchParams(location.search);
+  const params = new URLSearchParams(runtimeLocation.search);
   if (!params.has('url') && !params.has('title') && !params.has('text')) return;
   params.delete('url');
   params.delete('title');
   params.delete('text');
-  const next = `${location.pathname}${params.toString() ? `?${params}` : ''}${location.hash}`;
+  const next = `${runtimeLocation.pathname || '/'}${params.toString() ? `?${params}` : ''}${runtimeLocation.hash || ''}`;
   history.replaceState({}, '', next);
 }
 
@@ -95,7 +101,9 @@ function init() {
   if (fillCaptureForm(capture)) cleanQuery();
 }
 
-if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true });
-else init();
+if (typeof document !== 'undefined') {
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true });
+  else init();
+}
 
-export { bookmarkletCode, fillCaptureForm, queryCapture, DEFAULT_ENDPOINT };
+export { bookmarkletCode, extractSharedUrl, fillCaptureForm, queryCapture, DEFAULT_ENDPOINT };
