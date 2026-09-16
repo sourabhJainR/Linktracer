@@ -1,5 +1,5 @@
 const LINKTRACER_DB='linktracer-local';
-const LINKTRACER_DB_VERSION=5;
+const LINKTRACER_DB_VERSION=6;
 const LINKTRACER_STORES={
   links:{keyPath:'canonicalUrl'},
   outbox:{keyPath:'id',autoIncrement:true},
@@ -18,6 +18,7 @@ window.LinktracerDbReady=new Promise((resolve,reject)=>{
   request.onupgradeneeded=()=>ensureLinktracerStores(request.result);
   request.onsuccess=()=>{
     const db=request.result;
+    db.onversionchange=()=>db.close();
     const missing=Object.keys(LINKTRACER_STORES).filter(name=>!db.objectStoreNames.contains(name));
     if(missing.length){
       db.close();
