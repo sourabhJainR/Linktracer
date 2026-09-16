@@ -1,0 +1,3 @@
+.researchModeHealth{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.75rem;margin-top:1rem;padding:1rem;border:1px solid var(--border,#dbe3ef);border-radius:14px;background:var(--surface,#fff)}
+.researchModeHealth>div{display:flex;flex-direction:column;gap:.15rem}.researchModeHealth strong{font-size:1.15rem}.researchModeHealth small{color:var(--muted,#64748b)}.researchModeHealth .hint{grid-column:1/-1;margin:0}
+@media(max-width:640px){.researchModeHealth{grid-template-columns:1fr 1fr}.researchModeHealth .hint{grid-column:1/-1}}
