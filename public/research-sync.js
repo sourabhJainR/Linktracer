@@ -1,5 +1,5 @@
 const DB='linktracer-local',STORE='collections',OUTBOX='outbox',META='meta',PREFIX='research-session:';
-const open=()=>new Promise((resolve,reject)=>{const r=indexedDB.open(DB,5);r.onsuccess=()=>{const db=r.result;db.onversionchange=()=>db.close();resolve(db)};r.onerror=()=>reject(r.error)});
+const open=()=>new Promise((resolve,reject)=>{const r=indexedDB.open(DB,6);r.onsuccess=()=>{const db=r.result;db.onversionchange=()=>db.close();resolve(db)};r.onerror=()=>reject(r.error)});
 const req=r=>new Promise((resolve,reject)=>{r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)});
 const all=s=>open().then(db=>req(db.transaction(s).objectStore(s).getAll()).finally(()=>db.close()));
 const put=(s,v)=>open().then(db=>req(db.transaction(s,'readwrite').objectStore(s).put(v)).finally(()=>db.close()));
