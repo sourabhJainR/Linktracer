@@ -6,6 +6,7 @@ const index = fs.readFileSync('public/index.html', 'utf8');
 const manifest = fs.readFileSync('public/manifest.webmanifest', 'utf8');
 const sw = fs.readFileSync('public/sw.js', 'utf8');
 const capture = fs.readFileSync('public/capture-ecosystem.js', 'utf8');
+const extensionPopup = fs.readFileSync('extensions/chromium/popup.js', 'utf8');
 
 test('PWA exposes a GET share target that carries URL, title and text', () => {
   const parsed = JSON.parse(manifest);
@@ -17,9 +18,9 @@ test('PWA exposes a GET share target that carries URL, title and text', () => {
 test('capture shell handles shared and bookmarklet query parameters', () => {
   assert.match(index, /capture-ecosystem\.js\?v=/);
   assert.match(capture, /URLSearchParams/);
-  assert.match(capture, /capture-url/);
-  assert.match(capture, /capture-title/);
-  assert.match(capture, /capture-text/);
+  assert.match(capture, /params\.get\('url'\)/);
+  assert.match(capture, /params\.get\('title'\)/);
+  assert.match(capture, /params\.get\('text'\)/);
   assert.match(capture, /history\.replaceState/);
 });
 
@@ -35,10 +36,12 @@ test('service worker caches the capture module and manifest', () => {
   assert.match(sw, /manifest\.webmanifest/);
 });
 
-test('capture ecosystem keeps extension instructions local and portable', () => {
+test('capture extension is a portable Manifest V3 popup workflow', () => {
   const extensionManifest = JSON.parse(fs.readFileSync('extensions/chromium/manifest.json', 'utf8'));
   assert.equal(extensionManifest.manifest_version, 3);
   assert.equal(extensionManifest.permissions.includes('tabs'), true);
-  assert.match(fs.readFileSync('extensions/chromium/background.js', 'utf8'), /tabs\.query/);
+  assert.equal(extensionManifest.permissions.includes('storage'), true);
+  assert.match(extensionPopup, /tabs\.query/);
+  assert.match(extensionPopup, /storage\.local/);
   assert.match(fs.readFileSync('extensions/chromium/README.md', 'utf8'), /Load unpacked/i);
 });
