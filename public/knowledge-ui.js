@@ -2,7 +2,6 @@ import { normalizeKnowledge, scoreEvidence, buildKnowledgeGraph } from './knowle
 
 const DB_NAME = 'linktracer-local';
 const DB_VERSION = 6;
-const escapeHtml = value => String(value ?? '').replace(/[&<>\"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', "'": '&#39;' }[c]));
 
 function openDb() {
   return new Promise((resolve, reject) => {
@@ -23,26 +22,8 @@ async function readLinks() {
   } finally { db.close(); }
 }
 
-async function writeLinks(links) {
-  const db = await openDb();
-  try {
-    await new Promise((resolve, reject) => {
-      const tx = db.transaction('links', 'readwrite');
-      const store = tx.objectStore('links');
-      links.forEach(link => store.put(link));
-      tx.oncomplete = resolve;
-      tx.onerror = () => reject(tx.error);
-      tx.onabort = () => reject(tx.error || new Error('Knowledge normalization aborted'));
-    });
-  } finally { db.close(); }
-}
-
 async function normalizeLocalKnowledge() {
-  const links = await readLinks();
-  const normalized = links.map(normalizeKnowledge);
-  const changed = normalized.some((link, index) => JSON.stringify(link) !== JSON.stringify(links[index]));
-  if (changed) await writeLinks(normalized);
-  return normalized;
+  return readLinks();
 }
 
 function renderHealth(links) {
