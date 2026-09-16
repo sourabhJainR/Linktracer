@@ -11,7 +11,9 @@ const app = read('public/app.js');
 const io = read('public/io.js');
 const dbInit = read('public/db-init.js');
 const researchSync = read('public/research-sync.js');
+const categorySync = read('public/category-sync.js');
 const sw = read('public/sw.js');
+const server = read('server/index.js');
 
 const version = index.match(/styles\.css\?v=([^"']+)/)?.[1];
 
@@ -39,14 +41,29 @@ test('sync and background enrichment have explicit in-flight protection', () => 
   assert.match(app, /enrichInFlight/);
 });
 
-test('local database bootstrap runs before application storage access', () => {
+test('local database bootstrap is durable and shared at version 6', () => {
   assert.match(index, /db-init\.js\?v=/);
   assert.ok(index.indexOf('db-init.js') < index.indexOf('app.js'), 'database bootstrap must load before app.js');
-  assert.match(dbInit, /LINKTRACER_DB_VERSION=5/);
-  assert.match(dbInit, /links/);
-  assert.match(dbInit, /outbox/);
-  assert.match(dbInit, /meta/);
-  assert.match(dbInit, /collections/);
+  assert.match(dbInit, /LINKTRACER_DB_VERSION=6/);
+  assert.match(dbInit, /onversionchange=\(\)=>db\.close\(\)/);
+  for(const store of ['links','outbox','meta','collections'])assert.match(dbInit,new RegExp(store));
+  assert.match(dbInit, /indexedDB\.open=\(name,version/);
+  assert.match(dbInit, /version<LINKTRACER_DB_VERSION/);
+  assert.match(app, /DB_VERSION=5/);
+  assert.match(io, /IO_DB_VERSION=6/);
+  assert.match(researchSync, /indexedDB\.open\(DB,5\)/);
+  assert.match(categorySync, /indexedDB\.open\(DB,6\)/);
+});
+
+test('local link writes are queued before any network sync', () => {
+  assert.match(app, /await put\('links',m\);if\(queue\)await add\('outbox'/);
+  assert.match(io, /await ioPut\('links',merged\);await ioAdd\('outbox'/);
+});
+
+test('server stores application data on disk so restart does not reset links', () => {
+  assert.match(server, /new Database\(process\.env\.LINKTRACER_DB \|\| path\.join\(dataDir,'linktracer\.db'\)\)/);
+  assert.match(server, /journal_mode = WAL/);
+  assert.match(server, /CREATE TABLE IF NOT EXISTS links/);
 });
 
 test('service worker and index use the same cache-busting revision', () => {
