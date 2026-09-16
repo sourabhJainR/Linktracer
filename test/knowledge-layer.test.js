@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { normalizeKnowledge, buildKnowledgeGraph, scoreEvidence } from '../public/knowledge-layer.js';
+import fs from 'node:fs';
 
 test('normalizes claims and evidence relations without duplicate ids', () => {
   const link = {
@@ -18,8 +19,8 @@ test('normalizes claims and evidence relations without duplicate ids', () => {
   };
   const normalized = normalizeKnowledge(link);
   assert.deepEqual(normalized.tags, ['ai']);
-  assert.equal(normalized.claims.length, 1);
-  assert.equal(normalized.evidenceRelations.length, 1);
+  assert.equal(normalized.sourceContext.claims.length, 1);
+  assert.equal(normalized.sourceContext.evidenceRelations.length, 1);
 });
 
 test('builds a deterministic graph with typed claim evidence and related sources', () => {
@@ -45,4 +46,13 @@ test('evidence scoring is bounded and rewards independent signals', () => {
   assert.ok(weak >= 0 && weak <= 100);
   assert.ok(strong > weak);
   assert.ok(strong <= 100);
+});
+
+test('knowledge UI uses the shared engine and current IndexedDB schema', () => {
+  const ui = fs.readFileSync('public/knowledge-ui.js', 'utf8');
+  const index = fs.readFileSync('public/index.html', 'utf8');
+  assert.match(ui, /knowledge-layer\.js/);
+  assert.match(ui, /linktracer-local/);
+  assert.match(ui, /indexedDB\.open\([^,]+,\s*6\)/);
+  assert.match(index, /knowledge-ui\.js\?v=/);
 });
