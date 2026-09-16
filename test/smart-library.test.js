@@ -15,7 +15,7 @@ test('smart library keeps recent, favorites and follow-up links as separate view
   const result = partitionLinks([
     link('https://old.example', 100),
     link('https://favorite.example', 200, { favorite: true }),
-    link('https://followup.example', 300, { followUp: { enabled: true, dueAt: 400 } }),
+    link('https://followup.example', 300, { sourceContext: { followUp: { enabled: true, dueAt: 400 } } }),
     link('https://new.example', 500)
   ]);
 
@@ -34,7 +34,7 @@ test('only an explicit HTTP 404 is treated as removable link health', () => {
 
 test('capture and WhatsApp workspaces are transition panels rather than default content', () => {
   assert.match(index, /id=["']captureWorkspaceToggle["']/);
-  assert.match(index, /id=["']whatsappWorkspaceToggle["']/);
+  assert.match(index, /id=["'](?:whatsappWorkspaceToggle|whatsappTopBtn)["']/);
   assert.match(index, /id=["']captureWorkspace["']/);
   assert.match(index, /id=["']whatsappWorkspace["']/);
   assert.match(smart, /togglePanel\(/);
