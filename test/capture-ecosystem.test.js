@@ -34,7 +34,7 @@ test('capture shell handles shared and bookmarklet query parameters', () => {
 test('bookmarklet is generated for the current Linktracer origin without external dependencies', () => {
   const code = bookmarkletCode('http://localhost:8787');
   assert.match(code, /^javascript:/);
-  assert.match(code, /http:\\/\\/localhost:8787/);
+  assert.ok(code.includes('http://localhost:8787/'));
   assert.match(code, /encodeURIComponent/);
   assert.match(capture, /navigator\.clipboard/);
 });
