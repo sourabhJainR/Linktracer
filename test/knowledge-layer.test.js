@@ -53,6 +53,7 @@ test('knowledge UI uses the shared engine and current IndexedDB schema', () => {
   const index = fs.readFileSync('public/index.html', 'utf8');
   assert.match(ui, /knowledge-layer\.js/);
   assert.match(ui, /linktracer-local/);
-  assert.match(ui, /indexedDB\.open\([^,]+,\s*6\)/);
+  assert.match(ui, /indexedDB\.open\(DB_NAME, DB_VERSION\)/);
+  assert.match(ui, /const DB_VERSION = 6/);
   assert.match(index, /knowledge-ui\.js\?v=/);
 });
