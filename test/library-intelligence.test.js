@@ -36,9 +36,10 @@ test('library exposes an explicit all-links view alongside smart views',()=>{
   assert.match(libraryUiSource,/data-library-view="recent"/);
   assert.match(libraryUiSource,/data-library-view="favorites"/);
   assert.match(libraryUiSource,/data-library-view="followups"/);
-  assert.match(smartLibrarySource,/data-smart-section="recent"/);
-  assert.match(smartLibrarySource,/data-smart-section="favorites"/);
-  assert.match(smartLibrarySource,/data-smart-section="followups"/);
+  assert.match(smartLibrarySource,/data-smart-section="\$\{sectionName\}"/);
+  assert.match(smartLibrarySource,/section\('Recently added','recent'/);
+  assert.match(smartLibrarySource,/section\('Favorites','favorites'/);
+  assert.match(smartLibrarySource,/section\('Follow-up','followups'/);
 });
 
 test('list and grid views have distinct render classes and active controls',()=>{
@@ -48,6 +49,8 @@ test('list and grid views have distinct render classes and active controls',()=>
   assert.match(libraryUiSource,/classList\.toggle\('libraryGrid'/);
   assert.match(libraryUiSource,/aria-pressed/);
   assert.match(libraryUiSource,/data-layout/);
+  assert.match(libraryUiSource,/grid-template-columns:repeat\(auto-fill,minmax\(310px,1fr\)/);
+  assert.match(libraryUiSource,/grid-template-columns:1fr!important/);
 });
 
 test('library view and layout choices persist and reapply after library rerenders',()=>{
