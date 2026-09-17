@@ -58,3 +58,9 @@ test('library view and layout choices persist and reapply after library rerender
   assert.match(libraryUiSource,/document\.addEventListener\('linktracer-rendered'/);
   assert.match(libraryUiSource,/applyLibraryView\(\)/);
 });
+
+test('library UI is explicitly cache-busted for the service worker and module import',()=>{
+  assert.match(smartLibrarySource,/library-ui\.js\?v=20260917-2/);
+  assert.match(swSource,/CACHE='linktracer-v19'/);
+  assert.match(swSource,/library-ui\.js\?v=20260917-2/);
+});
