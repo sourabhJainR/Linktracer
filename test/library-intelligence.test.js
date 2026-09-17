@@ -49,3 +49,12 @@ test('list and grid views have distinct render classes and active controls',()=>
   assert.match(libraryUiSource,/aria-pressed/);
   assert.match(libraryUiSource,/data-layout/);
 });
+
+test('library view and layout choices persist and reapply after library rerenders',()=>{
+  assert.match(libraryUiSource,/LAYOUT_KEY='linktracer-layout'/);
+  assert.match(libraryUiSource,/VIEW_KEY='linktracer-library-view'/);
+  assert.match(libraryUiSource,/localStorage\.setItem\(VIEW_KEY/);
+  assert.match(libraryUiSource,/localStorage\.getItem\(VIEW_KEY\)/);
+  assert.match(libraryUiSource,/document\.addEventListener\('linktracer-rendered'/);
+  assert.match(libraryUiSource,/applyLibraryView\(\)/);
+});
