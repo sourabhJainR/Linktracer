@@ -30,11 +30,15 @@ test('keyboard command palette and saved-search actions are wired',()=>{
   assert.match(moduleSource,/data-delete-search/);
 });
 
-test('library has an explicit all-links view with a complete-library control',()=>{
+test('library exposes an explicit all-links view alongside smart views',()=>{
   assert.match(indexSource,/data-library-view="all"/);
   assert.match(indexSource,/>All links</);
-  assert.match(smartLibrarySource,/data-smart-section="all"/);
-  assert.match(smartLibrarySource,/partitionLinks\(items\).*all/);
+  assert.match(libraryUiSource,/data-library-view="recent"/);
+  assert.match(libraryUiSource,/data-library-view="favorites"/);
+  assert.match(libraryUiSource,/data-library-view="followups"/);
+  assert.match(smartLibrarySource,/data-smart-section="recent"/);
+  assert.match(smartLibrarySource,/data-smart-section="favorites"/);
+  assert.match(smartLibrarySource,/data-smart-section="followups"/);
 });
 
 test('list and grid views have distinct render classes and active controls',()=>{
