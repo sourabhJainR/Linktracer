@@ -32,7 +32,7 @@ test('keyboard command palette and saved-search actions are wired',()=>{
 
 test('library exposes an explicit all-links view alongside smart views',()=>{
   assert.match(indexSource,/data-library-view="all"/);
-  assert.match(indexSource,/>All links</);
+  assert.match(indexSource,/>\s*All links\s*<\/span>/);
   assert.match(libraryUiSource,/data-library-view="recent"/);
   assert.match(libraryUiSource,/data-library-view="favorites"/);
   assert.match(libraryUiSource,/data-library-view="followups"/);
