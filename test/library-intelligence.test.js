@@ -5,6 +5,7 @@ import path from 'node:path';
 
 const root=path.resolve(process.cwd(),'public');
 const moduleSource=fs.readFileSync(path.join(root,'library-intelligence.js'),'utf8');
+const appSource=fs.readFileSync(path.join(root,'app.js'),'utf8');
 const indexSource=fs.readFileSync(path.join(root,'index.html'),'utf8');
 const swSource=fs.readFileSync(path.join(root,'sw.js'),'utf8');
 const libraryUiSource=fs.readFileSync(path.join(root,'library-ui.js'),'utf8');
@@ -71,10 +72,10 @@ test('library UI is explicitly cache-busted for the service worker and module im
 
 test('library command center exposes sorting and quick actions',()=>{
   assert.match(indexSource,/id="sortOrder"/);
-  assert.match(moduleSource,/SORT_KEY='linktracer-sort'/);
-  assert.match(moduleSource,/localStorage\.setItem\(SORT_KEY/);
-  assert.match(moduleSource,/data-action="favorite"/);
-  assert.match(moduleSource,/data-action="followup"/);
+  assert.match(appSource,/SORT_KEY='linktracer-sort'/);
+  assert.match(appSource,/localStorage\.setItem\(SORT_KEY/);
+  assert.match(appSource,/data-action="favorite"/);
+  assert.match(appSource,/data-action="followup"/);
   assert.match(indexSource,/Most highlights/);
   assert.match(indexSource,/Most notes/);
 });
