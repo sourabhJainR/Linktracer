@@ -48,7 +48,7 @@ test('list and grid views have distinct render classes and active controls',()=>
   assert.match(libraryUiSource,/classList\.toggle\('libraryList'/);
   assert.match(libraryUiSource,/classList\.toggle\('libraryGrid'/);
   assert.match(libraryUiSource,/aria-pressed/);
-  assert.match(libraryUiSource,/data-layout/);
+  assert.match(libraryUiSource,/dataset\.layout=layout/);
   assert.match(libraryUiSource,/grid-template-columns:repeat\(auto-fill,minmax\(310px,1fr\)/);
   assert.match(libraryUiSource,/grid-template-columns:1fr!important/);
 });
