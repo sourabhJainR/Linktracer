@@ -67,3 +67,14 @@ test('library UI is explicitly cache-busted for the service worker and module im
   assert.match(swSource,/CACHE='linktracer-v19'/);
   assert.match(swSource,/library-ui\.js\?v=20260917-2/);
 });
+
+
+test('library command center exposes sorting and quick actions',()=>{
+  assert.match(indexSource,/id="sortOrder"/);
+  assert.match(moduleSource,/SORT_KEY='linktracer-sort'/);
+  assert.match(moduleSource,/localStorage\.setItem\(SORT_KEY/);
+  assert.match(moduleSource,/data-action="favorite"/);
+  assert.match(moduleSource,/data-action="followup"/);
+  assert.match(moduleSource,/Most highlights/);
+  assert.match(moduleSource,/Most notes/);
+});
