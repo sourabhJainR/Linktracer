@@ -1,4 +1,4 @@
-import './library-ui.js';
+import './library-ui.js?v=20260917-2';
 
 const SMART_DB='linktracer-local';
 const SMART_DB_VERSION=6;
