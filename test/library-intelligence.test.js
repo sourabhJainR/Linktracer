@@ -12,8 +12,8 @@ const smartLibrarySource=fs.readFileSync(path.join(root,'smart-library.js'),'utf
 
 test('library intelligence exposes the PR1 workflows',()=>{
   for(const marker of ['Command palette','Duplicate center','Saved searches','Bulk select','data-bulk-action="delete"','linktracer-saved-searches'])assert.match(moduleSource,new RegExp(marker.replace(/[.*+?^${}()|[\\]\\]/g,'\\$&')));
-  assert.match(indexSource,/library-intelligence\.js\?v=20260917-2/);
-  assert.match(swSource,/library-intelligence\.js\?v=20260917-2/);
+  assert.match(indexSource,/library-intelligence\.js\?v=20260918-1/);
+  assert.match(swSource,/library-intelligence\.js\?v=20260918-1/);
 });
 
 test('bulk deletion uses the durable local outbox protocol',()=>{
@@ -63,9 +63,9 @@ test('library view and layout choices persist and reapply after library rerender
 });
 
 test('library UI is explicitly cache-busted for the service worker and module import',()=>{
-  assert.match(smartLibrarySource,/library-ui\.js\?v=20260917-2/);
+  assert.match(smartLibrarySource,/library-ui\.js\?v=20260918-1/);
   assert.match(swSource,/CACHE='linktracer-v20'/);
-  assert.match(swSource,/library-ui\.js\?v=20260917-2/);
+  assert.match(swSource,/library-ui\.js\?v=20260918-1/);
 });
 
 
