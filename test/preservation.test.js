@@ -11,8 +11,8 @@ const sw=fs.readFileSync(path.join(root,'public','sw.js'),'utf8');
 
 test('preservation UI and archive links are wired',()=>{
   for(const marker of ['data-preservation-action','Preservation:','https://web.archive.org/save/','https://web.archive.org/web/','/api/preservation'])assert.match(preservation,new RegExp(marker.replace(/[.*+?^${}()|[\\]\\]/g,'\\$&')));
-  assert.match(index,/preservation\.js\?v=20260917-1/);
-  assert.match(sw,/preservation\.js\?v=20260917-1/);
+  assert.match(index,/preservation\.js\?v=20260918-1/);
+  assert.match(sw,/preservation\.js\?v=20260918-1/);
 });
 
 test('preservation state is durable through the existing link outbox',()=>{
