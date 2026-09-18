@@ -64,7 +64,7 @@ test('library view and layout choices persist and reapply after library rerender
 
 test('library UI is explicitly cache-busted for the service worker and module import',()=>{
   assert.match(smartLibrarySource,/library-ui\.js\?v=20260917-2/);
-  assert.match(swSource,/CACHE='linktracer-v19'/);
+  assert.match(swSource,/CACHE='linktracer-v20'/);
   assert.match(swSource,/library-ui\.js\?v=20260917-2/);
 });
 
@@ -75,6 +75,6 @@ test('library command center exposes sorting and quick actions',()=>{
   assert.match(moduleSource,/localStorage\.setItem\(SORT_KEY/);
   assert.match(moduleSource,/data-action="favorite"/);
   assert.match(moduleSource,/data-action="followup"/);
-  assert.match(moduleSource,/Most highlights/);
-  assert.match(moduleSource,/Most notes/);
+  assert.match(indexSource,/Most highlights/);
+  assert.match(indexSource,/Most notes/);
 });
