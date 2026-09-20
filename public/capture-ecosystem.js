@@ -93,6 +93,7 @@ function cleanQuery() {
   params.delete('url');
   params.delete('title');
   params.delete('text');
+  params.delete('source');
   const next = `${runtimeLocation.pathname || '/'}${params.toString() ? `?${params}` : ''}${runtimeLocation.hash || ''}`;
   history.replaceState({}, '', next);
 }
