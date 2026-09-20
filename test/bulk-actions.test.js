@@ -47,6 +47,6 @@ test('bulk selection is wired to the existing local-first app surface',()=>{
 });
 
 test('service worker cache is revisioned for bulk-action changes',()=>{
-  assert.match(sw,/const CACHE='linktracer-v\\d+'/);
+  assert.ok(sw.includes("const CACHE='linktracer-v24'"));
   assert.ok(sw.includes('library-intelligence.js?v=20260921-2'));
 });
