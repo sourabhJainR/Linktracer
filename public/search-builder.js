@@ -29,7 +29,7 @@ function renderChips(){
   host.innerHTML=chips.map((token,i)=>`<button type="button" class="filterChip" data-filter-chip="${i}" title="Remove ${token}">${token}<span aria-hidden="true">×</span></button>`).join('');
   host.hidden=!chips.length;
 }
-function removeFilter(index){const next=tokens($('search')?.value||'').filter((token,i)=>!(managed(token)&&managedTokens().indexOf(token)===index));setSearch(next.join(' '));syncFields()}
+function removeFilter(index){const managedList=managedTokens(),target=managedList[index];let occurrence=0;const next=tokens($('search')?.value||'').filter(token=>{if(!managed(token))return true;if(token!==target)return true;return occurrence++!==0});setSearch(next.join(' '));syncFields()}
 function apply(){setSearch(buildTokens());syncFields();renderChips();close()}
 function clear(){setSearch(tokens($('search')?.value||'').filter(token=>!managed(token)).join(' '));syncFields();renderChips()}
 function close(){const panel=$('filterBuilder'),button=$('filterBuilderBtn');if(panel)panel.hidden=true;if(button)button.setAttribute('aria-expanded','false')}
