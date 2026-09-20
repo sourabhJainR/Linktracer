@@ -13,8 +13,8 @@ const smartLibrarySource=fs.readFileSync(path.join(root,'smart-library.js'),'utf
 
 test('library intelligence exposes the PR1 workflows',()=>{
   for(const marker of ['Command palette','Duplicate center','Saved searches','Bulk select','data-bulk-action="delete"','linktracer-saved-searches'])assert.match(moduleSource,new RegExp(marker.replace(/[.*+?^${}()|[\\]\\]/g,'\\$&')));
-  assert.match(indexSource,/library-intelligence\.js\?v=20260918-1/);
-  assert.match(swSource,/library-intelligence\.js\?v=20260918-1/);
+  assert.match(indexSource,/library-intelligence\.js\?v=20260921-2/);
+  assert.match(swSource,/library-intelligence\.js\?v=20260921-2/);
 });
 
 test('bulk deletion uses the durable local outbox protocol',()=>{
