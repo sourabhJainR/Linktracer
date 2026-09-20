@@ -8,6 +8,7 @@ const manifest = fs.readFileSync('public/manifest.webmanifest', 'utf8');
 const sw = fs.readFileSync('public/sw.js', 'utf8');
 const capture = fs.readFileSync('public/capture-ecosystem.js', 'utf8');
 const extensionPopup = fs.readFileSync('extensions/chromium/popup.js', 'utf8');
+const appSource = fs.readFileSync('public/app.js', 'utf8');
 
 test('PWA exposes a GET share target that carries URL, title and text', () => {
   const parsed = JSON.parse(manifest);
@@ -28,7 +29,10 @@ test('capture shell handles shared and bookmarklet query parameters', () => {
   assert.match(capture, /params\.get\('title'\)/);
   assert.match(capture, /params\.get\('text'\)/);
   assert.match(capture, /history\.replaceState/);
-  assert.deepEqual(queryCapture('?url=https%3A%2F%2Fexample.com&title=Example&text=Context'), { url: 'https://example.com', title: 'Example', text: 'Context' });
+  assert.match(capture, /params\.delete\('source'\)/);
+  assert.deepEqual(queryCapture('?url=https%3A%2F%2Fexample.com&title=Example&text=Context'), { url: 'https://example.com', title: 'Example', text: 'Context', source: 'share-target' });
+  assert.match(appSource, /const captureWorkspace=\$\('captureWorkspace'\);const captureSource=captureWorkspace\?\.dataset\.captureSource\|\|'manual';/);
+  assert.match(appSource, /context=\{deviceId,captureSource\}/);
 });
 
 test('bookmarklet is generated for the current Linktracer origin without external dependencies', () => {

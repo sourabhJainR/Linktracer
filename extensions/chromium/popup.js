@@ -20,6 +20,7 @@ document.querySelector('#save').addEventListener('click', async () => {
     if (!tab?.url || !/^https?:/i.test(tab.url)) throw new Error('The active tab is not an HTTP/HTTPS page.');
     const target = new URL(endpoint);
     target.searchParams.set('url', tab.url);
+    target.searchParams.set('source', 'extension');
     if (tab.title) target.searchParams.set('title', tab.title);
     window.open(target.toString(), '_blank');
     status.textContent = 'Capture form opened in Linktracer.';
