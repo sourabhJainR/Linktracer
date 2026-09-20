@@ -13,7 +13,7 @@ test('bulk actions 2.0 supports scoped selection and visible-set controls',()=>{
     'Select all visible',
     'Clear selection',
     'Invert selection',
-    'selected visible',
+    'visible results',
     'getVisibleLinks'
   ]) assert.ok(intelligence.includes(marker)||app.includes(marker), marker);
 });
@@ -42,8 +42,8 @@ test('bulk workflows include selection export and feedback',()=>{
 test('bulk selection is wired to the existing local-first app surface',()=>{
   assert.ok(app.includes('getLinks:()=>links'));
   assert.ok(app.includes('getVisibleLinks:()=>visible'));
-  assert.ok(intelligence.includes('LinktracerTriage'));
-  assert.ok(intelligence.includes('LinktracerSmartLibrary'));
+  assert.ok(intelligence.includes('bulkMutate'));
+  assert.ok(intelligence.includes('visibleLinks'));
 });
 
 test('service worker cache is revisioned for bulk-action changes',()=>{
