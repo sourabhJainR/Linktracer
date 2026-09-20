@@ -15,7 +15,8 @@ function queryCapture(search = runtimeLocation.search) {
   const text = safeValue(params.get('text'));
   const url = safeValue(params.get('url')) || extractSharedUrl(text);
   const title = safeValue(params.get('title'));
-  return { url, title, text };
+  const source = safeValue(params.get('source')) || ((url || text) ? 'share-target' : 'manual');
+  return { url, title, text, source };
 }
 
 function fillCaptureForm(capture) {
@@ -28,6 +29,7 @@ function fillCaptureForm(capture) {
   url.value = capture.url;
   if (title && capture.title) title.value = capture.title;
   if (description && capture.text) description.value = capture.text;
+  if (workspace) workspace.dataset.captureSource = capture.source || 'manual';
   workspace?.removeAttribute('hidden');
   workspace?.classList.add('smartPanelOpen');
   workspace?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -38,7 +40,7 @@ function fillCaptureForm(capture) {
 
 function bookmarkletCode(origin = runtimeLocation.origin) {
   const target = `${origin}/`;
-  const script = `const u=location.href,t=document.title,s=(window.getSelection&&String(window.getSelection()))||'';location.href=${JSON.stringify(target)}+'?url='+encodeURIComponent(u)+'&title='+encodeURIComponent(t)+'&text='+encodeURIComponent(s.slice(0,4000))`;
+  const script = `const u=location.href,t=document.title,s=(window.getSelection&&String(window.getSelection()))||'';location.href=${JSON.stringify(target)}+'?url='+encodeURIComponent(u)+'&title='+encodeURIComponent(t)+'&text='+encodeURIComponent(s.slice(0,4000))+'&source=bookmarklet'`;
   return `javascript:(()=>{${script}})()`;
 }
 
