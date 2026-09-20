@@ -125,9 +125,8 @@ async function applyAction(action,canonicalUrl){
 }
 function setStatus(message){const e=$('status');if(e)e.textContent=message}
 async function processNext(currentUrl=''){
-  const link=(await readLinks()).find(x=>x.canonicalUrl===nextInboxLink(arguments.length?await readLinks():[],currentUrl));
-  if(link){window.LinktracerApp?.openReader?.(link);return}
-  const links=await readLinks(),next=nextInboxLink(links,currentUrl);
+  const links=await readLinks();
+  const next=nextInboxLink(links,currentUrl);
   if(next){const item=links.find(x=>x.canonicalUrl===next);window.LinktracerApp?.openReader?.(item);return}
   setStatus('Inbox is clear');
 }
