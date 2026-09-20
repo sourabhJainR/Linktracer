@@ -13,15 +13,15 @@ test('rich source preview exposes provenance, health, type and saved context',()
   for(const marker of ['readerSourcePreview','readerSourceBadge','readerHealth','readerType','readerTags','readerActions']){
     assert.ok(indexSource.includes(marker)||appSource.includes(marker)||cssSource.includes(marker),marker);
   }
-  assert.match(appSource,/sourceLabelOf(l)/);
+  assert.ok(appSource.includes('sourceLabelOf(l)'));
   assert.match(appSource,/contentType/);
   assert.match(appSource,/health/);
   assert.match(appSource,/readerOpenLink/);
 });
 
 test('rich preview preserves local-first reader content and knowledge',()=>{
-  assert.match(appSource,/highlights(l)/);
-  assert.match(appSource,/annotations(l)/);
+  assert.ok(appSource.includes('highlights(l)'));
+  assert.ok(appSource.includes('annotations(l)'));
   assert.match(appSource,/sourceContext/);
 });
 
