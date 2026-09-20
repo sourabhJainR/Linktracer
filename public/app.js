@@ -64,6 +64,6 @@ window.addEventListener('linktracer-rendered',()=>{window.LinktracerCategoryTabs
 window.addEventListener('research-sync-updated',()=>refreshData());
 window.addEventListener('online',()=>window.ioSync?.());
 
-window.LinktracerApp={sync,refresh:refreshData,render,saveLocal,getLinks:()=>links,openReader};
+window.LinktracerApp={sync,refresh:refreshData,render,saveLocal,getLinks:()=>links,getVisibleLinks:()=>visible(),openReader};
 (async()=>{await refreshData();setStatus(navigator.onLine?'Online - ready to sync':'Offline - local storage active');if(navigator.onLine)await sync()})();
 if('serviceWorker'in navigator)navigator.serviceWorker.register('/sw.js');
