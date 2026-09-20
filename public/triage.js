@@ -17,7 +17,7 @@ function openDb(){
     r.onerror=()=>reject(r.error||new Error('Unable to open local database'));
   });
 }
-const dbp=globalThis.LinktracerDbReady?globalThis.LinktracerDbReady.then(openDb):openDb();
+const dbp=typeof indexedDB!=='undefined'?(globalThis.LinktracerDbReady?globalThis.LinktracerDbReady.then(openDb):openDb()):null;
 function request(req){return new Promise((resolve,reject)=>{req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error)})}
 function txDone(tx){return new Promise((resolve,reject)=>{tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error||new Error('Transaction aborted'))})}
 function deviceId(){return localStorage.getItem('linktracer-device')||crypto.randomUUID()}
