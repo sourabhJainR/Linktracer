@@ -29,6 +29,7 @@ test('capture shell handles shared and bookmarklet query parameters', () => {
   assert.match(capture, /params\.get\('title'\)/);
   assert.match(capture, /params\.get\('text'\)/);
   assert.match(capture, /history\.replaceState/);
+  assert.match(capture, /params\.delete\('source'\)/);
   assert.deepEqual(queryCapture('?url=https%3A%2F%2Fexample.com&title=Example&text=Context'), { url: 'https://example.com', title: 'Example', text: 'Context', source: 'share-target' });
   assert.match(appSource, /const captureWorkspace=\$\('captureWorkspace'\);const captureSource=captureWorkspace\?\.dataset\.captureSource\|\|'manual';/);
   assert.match(appSource, /context=\{deviceId,captureSource\}/);
