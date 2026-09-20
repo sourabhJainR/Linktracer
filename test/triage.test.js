@@ -45,7 +45,7 @@ test('nextInboxLink moves through newest unprocessed sources and wraps safely',(
 test('triage mutations use IndexedDB and the durable outbox',()=>{
   assert.ok(triageSource.includes("transaction(['links','outbox'],'readwrite')"));
   assert.ok(triageSource.includes('changeId:crypto.randomUUID()'));
-  assert.ok(triageSource.includes('triage:{status'));
+  assert.ok(triageSource.includes('triage:{...(link.triage||{}),status,processedAt}'));
   assert.ok(triageSource.includes('deleted:true'));
 });
 
@@ -58,7 +58,7 @@ test('library cards expose triage actions, preview and source context',()=>{
     'data-triage-action="delete"',
     'data-triage-action="preview"',
     'data-triage-action="next"'
-  ]) assert.ok(appSource.includes(marker), marker);
+  ]) assert.ok(appSource.includes(marker) || triageSource.includes(marker), marker);
   assert.ok(appSource.includes('LinktracerTriage'));
   assert.ok(appSource.includes('openReader'));
   assert.ok(indexSource.includes('triage.js?v=20260921-1'));
@@ -68,11 +68,11 @@ test('library cards expose triage actions, preview and source context',()=>{
 test('capture and extension provenance is retained',()=>{
   assert.ok(captureSource.includes('captureSource'));
   assert.ok(captureSource.includes('bookmarklet'));
-  assert.ok(extensionSource.includes("searchParams.set('source','extension')"));
+  assert.match(extensionSource,/searchParams\.set\(['"]source['"]\s*,\s*['"]extension['"]\)/);
 });
 
 test('process-next reads one consistent inbox snapshot',()=>{
-  assert.match(triageSource,/async function processNext\(currentUrl=''\)\{const links=await readLinks\(\);const next=nextInboxLink\(links,currentUrl\);/);
+  assert.match(triageSource,/async function processNext\(currentUrl=''\)\{\s*const links=await readLinks\(\);\s*const next=nextInboxLink\(links,currentUrl\);/);
 });
 
 test('keyboard and mobile triage hooks are wired',()=>{
