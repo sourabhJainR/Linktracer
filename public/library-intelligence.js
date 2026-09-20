@@ -73,7 +73,8 @@ function showBulk(){
 async function renderBulkList(){
   const target=$('bulkList');if(!target)return;
   const ls=await visibleLinks();
-  const count=$('[data-bulk-count]');
+  for(const key of [...state.selected])if(!ls.some(l=>l.canonicalUrl===key))state.selected.delete(key);
+  const count=document.querySelector('[data-bulk-count]');
   if(count)count.textContent=`${state.selected.size} selected`;
   const scope=$('bulkScopeLabel');
   if(scope)scope.textContent=`${ls.length} visible results`;
@@ -83,7 +84,7 @@ function downloadText(name,text,type='application/json'){
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type}));a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
 }
 async function bulkAction(action){
-  const allLinks=await links(), selected=allLinks.filter(l=>state.selected.has(l.canonicalUrl));
+  const scopedLinks=await visibleLinks(), selected=scopedLinks.filter(l=>state.selected.has(l.canonicalUrl));
   if(!selected.length){$('status')&&($('status').textContent='Select at least one link first');return}
   if(action==='open'){selected.slice(0,10).forEach(l=>window.open(l.url,'_blank','noopener,noreferrer'));$('status')&&($('status').textContent=`Opened ${Math.min(selected.length,10)} selected link${selected.length===1?'':'s'}`);return}
   if(action==='copy'){await navigator.clipboard?.writeText(selected.map(l=>l.url).join('\n'));$('status')&&($('status').textContent=`Copied ${selected.length} URLs`);return}
@@ -106,7 +107,7 @@ async function bulkAction(action){
 
 document.addEventListener('change',e=>{
   const u=e.target.closest('[data-bulk-url]')?.dataset.bulkUrl;
-  if(u){e.target.checked?state.selected.add(u):state.selected.delete(u);const count=$('[data-bulk-count]');if(count)count.textContent=`${state.selected.size} selected`;}
+  if(u){e.target.checked?state.selected.add(u):state.selected.delete(u);const count=document.querySelector('[data-bulk-count]');if(count)count.textContent=`${state.selected.size} selected`;}
 });
 document.addEventListener('click',async e=>{const b=e.target.closest('[data-intel],[data-cmd],[data-bulk-action],[data-bulk-select],[data-save-search],[data-run-search],[data-delete-search],[data-dup-search],[data-intel-close]');if(!b)return;if(b.matches('[data-intel="command"]'))showCommand();else if(b.dataset.intel==='duplicates'||b.dataset.cmd==='duplicates')showDuplicates();else if(b.dataset.intel==='saved'||b.dataset.cmd==='saved')showSaved();else if(b.dataset.intel==='bulk'||b.dataset.cmd==='bulk')showBulk();else if(b.dataset.cmd==='search'){$('search')?.focus();closePanel()}else if(b.dataset.cmd==='clear'){$('clearSearch')?.click();closePanel()}else if(b.hasAttribute('data-intel-close'))closePanel();else if(b.hasAttribute('data-save-search')){const name=$('savedSearchName')?.value.trim(),query=$('savedSearchQuery')?.value.trim();if(name&&query){state.saved.push({name,query});saveSaved();showSaved()}}else if(b.hasAttribute('data-run-search')){$('search').value=state.saved[Number(b.dataset.runSearch)]?.query||'';$('search').dispatchEvent(new Event('input'));closePanel()}else if(b.hasAttribute('data-delete-search')){state.saved.splice(Number(b.dataset.deleteSearch),1);saveSaved();showSaved()}else if(b.hasAttribute('data-dup-search')){$('search').value=`${b.dataset.dupSearch||''} duplicate:true`;$('search').dispatchEvent(new Event('input'));closePanel()}else if(b.hasAttribute('data-bulk-select')){
     const visible=await visibleLinks();
