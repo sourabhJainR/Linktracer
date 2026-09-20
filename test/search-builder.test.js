@@ -9,7 +9,7 @@ const builderSource=fs.readFileSync(path.join(root,'search-builder.js'),'utf8');
 const swSource=fs.readFileSync(path.join(root,'sw.js'),'utf8');
 
 test('search builder exposes compatible visual filters',()=>{
-  for(const marker of ['filterBuilder','Tag','Content type','Domain','Health','Duplicate','Triage','dateAfter','dateBefore','Apply filters','Clear filters']){
+  for(const marker of ['filterBuilder','Tag','Content type','Domain','Health','Duplicate','Triage','after:','before:','Apply filters','Clear filters']){
     assert.ok(indexSource.includes(marker)||builderSource.includes(marker),marker);
   }
   assert.ok(builderSource.includes('tag:'));
