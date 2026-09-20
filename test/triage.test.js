@@ -71,6 +71,10 @@ test('capture and extension provenance is retained',()=>{
   assert.ok(extensionSource.includes("searchParams.set('source','extension')"));
 });
 
+test('process-next reads one consistent inbox snapshot',()=>{
+  assert.match(triageSource,/async function processNext\(currentUrl=''\)\{const links=await readLinks\(\);const next=nextInboxLink\(links,currentUrl\);/);
+});
+
 test('keyboard and mobile triage hooks are wired',()=>{
   assert.ok(triageSource.includes('keydown'));
   assert.ok(triageSource.includes('[data-triage-card]'));
