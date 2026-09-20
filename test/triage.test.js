@@ -42,6 +42,10 @@ test('nextInboxLink moves through newest unprocessed sources and wraps safely',(
   assert.equal(nextInboxLink(links,'a',{wrap:false}), 'c');
 });
 
+test('triage module is safe to import outside a browser runtime',()=>{
+  assert.ok(triageSource.includes("typeof indexedDB!=='undefined'"));
+});
+
 test('triage mutations use IndexedDB and the durable outbox',()=>{
   assert.ok(triageSource.includes("transaction(['links','outbox'],'readwrite')"));
   assert.ok(triageSource.includes('changeId:crypto.randomUUID()'));
