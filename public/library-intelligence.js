@@ -1,3 +1,4 @@
+import { duplicateGroups, mergeDuplicateMetadata } from './duplicate-resolution.js?v=20260921-1';
 const DB_NAME='linktracer-local',DB_VERSION=6;
 const $=id=>document.getElementById(id);
 const state={selected:new Set(),saved:JSON.parse(localStorage.getItem('linktracer-saved-searches')||'[]')};
@@ -43,7 +44,36 @@ function layout(){const lib=document.querySelector('.librarySection');if(!lib)re
 function panel(html){const p=$('intelPanel');if(!p)return;p.innerHTML=html;p.hidden=false;p.tabIndex=-1;p.focus()}
 function closePanel(){const p=$('intelPanel');if(p)p.hidden=true}
 function showCommand(){panel(`<div class="intelPanelHead"><strong>Command palette</strong><button type="button" data-intel-close>Close</button></div><input id="intelCommandSearch" type="search" placeholder="Search actions…"><div class="commandList"><button data-cmd="search">Search library</button><button data-cmd="duplicates">Review duplicates</button><button data-cmd="saved">Saved searches</button><button data-cmd="bulk">Select links</button><button data-cmd="clear">Clear search</button></div>`);$('intelCommandSearch')?.focus()}
-async function showDuplicates(){const ls=await links(),groups=new Map();for(const l of ls){const title=String(l.title||'').toLowerCase().replace(/[^a-z0-9]+/g,' ').replace(/\b(the|a|an|official|home|homepage)\b/g,' ').replace(/\s+/g,' ').trim();if(title.length<10)continue;const host=(()=>{try{return new URL(l.url).hostname.replace(/^www\./,'').toLowerCase()}catch{return''}})();const k=host+'|'+title;if(!groups.has(k))groups.set(k,[]);groups.get(k).push(l)}const dup=[...groups.values()].filter(g=>g.length>1);panel(`<div class="intelPanelHead"><strong>Duplicate center</strong><span>${dup.length} groups</span><button type="button" data-intel-close>Close</button></div>${dup.length?dup.map((g,i)=>`<section class="duplicateGroup"><strong>Possible duplicate ${i+1}</strong>${g.map(l=>`<label><input type="checkbox" data-dup-url="${esc(l.canonicalUrl)}"> ${esc(l.title||l.url)} <small>${esc(l.url)}</small></label>`).join('')}<button type="button" data-dup-search="${esc(g[0].title||'')}">Open in search</button></section>`).join(''):'<p>No likely duplicates found.</p>'}`)}
+async function showDuplicates(){
+  const ls=await links(),groups=duplicateGroups(ls);
+  panel(`<div class="intelPanelHead"><strong>Duplicate center</strong><span>${groups.length} groups</span><button type="button" data-intel-close>Close</button></div>${groups.length?groups.map((g,i)=>`<section class="duplicateGroup" data-dup-group="${i}"><strong>Possible duplicate ${i+1}</strong><span class="hint">Choose the source to keep; merge brings notes, highlights, tags and source context into it.</span>${g.map((l,j)=>`<label><input type="radio" name="dup-keeper-${i}" data-dup-keeper="${i}" value="${esc(l.canonicalUrl)}" ${j===0?'checked':''}> ${esc(l.title||l.url)} <small>${esc(l.url)}</small></label>`).join('')}<div class="bulkActions"><button type="button" data-dup-merge="${i}">Merge into keeper</button><button type="button" data-dup-delete="${i}" class="subtle">Delete other copies</button><button type="button" data-dup-search="${esc(g[0].title||'')}">Open in search</button></div></section>`).join(''):'<p>No likely duplicates found.</p>'}`);
+}
+async function resolveDuplicateGroup(index,deleteOnly=false){
+  const groups=duplicateGroups(await links()),group=groups[index];
+  if(!group||group.length<2)return;
+  const keeperUrl=document.querySelector(`[data-dup-keeper="${index}"]:checked`)?.value||group[0].canonicalUrl;
+  const keeper=group.find(x=>x.canonicalUrl===keeperUrl)||group[0];
+  const others=group.filter(x=>x.canonicalUrl!==keeper.canonicalUrl);
+  if(deleteOnly&&!confirm(`Delete ${others.length} duplicate cop${others.length===1?'y':'ies'} and keep the selected source?`))return;
+  if(!deleteOnly&&!confirm(`Merge ${others.length} duplicate cop${others.length===1?'y':'ies'} into “${keeper.title||keeper.url}” and remove the redundant sources?`))return;
+  const merged=deleteOnly?keeper:mergeDuplicateMetadata(keeper,others);
+  const db=await openDb();
+  try{
+    const tx=db.transaction(['links','outbox'],'readwrite'),store=tx.objectStore('links'),out=tx.objectStore('outbox'),now=Date.now();
+    store.put(deleteOnly?{...keeper}:merged);
+    if(!deleteOnly)out.add({...merged,changeId:crypto.randomUUID(),deviceId:deviceId(),queuedAt:now});
+    else out.add({...keeper,changeId:crypto.randomUUID(),deviceId:deviceId(),queuedAt:now});
+    for(const link of others){
+      store.delete(link.canonicalUrl);
+      out.add({entityType:'link',canonicalUrl:link.canonicalUrl,deleted:true,sourceContext:{removedReason:'duplicate-resolved',removedAt:now,keptCanonicalUrl:keeper.canonicalUrl},changeId:crypto.randomUUID(),deviceId:deviceId(),queuedAt:now});
+    }
+    await txDone(tx);
+  }finally{db.close()}
+  $('status')&&($('status').textContent=deleteOnly?'Duplicate copies deleted':'Duplicates merged into selected keeper');
+  await window.LinktracerApp?.refresh?.();
+  showDuplicates();
+}
+
 function showSaved(){panel(`<div class="intelPanelHead"><strong>Saved searches</strong><button type="button" data-intel-close>Close</button></div><div class="savedSearchCreate"><input id="savedSearchName" placeholder="Name"><input id="savedSearchQuery" placeholder="Search query"><button type="button" data-save-search>Save</button></div>${state.saved.length?state.saved.map((s,i)=>`<div class="savedSearchRow"><button type="button" data-run-search="${i}">${esc(s.name)}</button><code>${esc(s.query)}</code><button type="button" data-delete-search="${i}">Delete</button></div>`).join(''):'<p>No saved searches yet.</p>'}`)}
 function showBulk(){
   state.selected.clear();
@@ -109,7 +139,7 @@ document.addEventListener('change',e=>{
   const u=e.target.closest('[data-bulk-url]')?.dataset.bulkUrl;
   if(u){e.target.checked?state.selected.add(u):state.selected.delete(u);const count=document.querySelector('[data-bulk-count]');if(count)count.textContent=`${state.selected.size} selected`;}
 });
-document.addEventListener('click',async e=>{const b=e.target.closest('[data-intel],[data-cmd],[data-bulk-action],[data-bulk-select],[data-save-search],[data-run-search],[data-delete-search],[data-dup-search],[data-intel-close]');if(!b)return;if(b.matches('[data-intel="command"]'))showCommand();else if(b.dataset.intel==='duplicates'||b.dataset.cmd==='duplicates')showDuplicates();else if(b.dataset.intel==='saved'||b.dataset.cmd==='saved')showSaved();else if(b.dataset.intel==='bulk'||b.dataset.cmd==='bulk')showBulk();else if(b.dataset.cmd==='search'){$('search')?.focus();closePanel()}else if(b.dataset.cmd==='clear'){$('clearSearch')?.click();closePanel()}else if(b.hasAttribute('data-intel-close'))closePanel();else if(b.hasAttribute('data-save-search')){const name=$('savedSearchName')?.value.trim(),query=$('savedSearchQuery')?.value.trim();if(name&&query){state.saved.push({name,query});saveSaved();showSaved()}}else if(b.hasAttribute('data-run-search')){$('search').value=state.saved[Number(b.dataset.runSearch)]?.query||'';$('search').dispatchEvent(new Event('input'));closePanel()}else if(b.hasAttribute('data-delete-search')){state.saved.splice(Number(b.dataset.deleteSearch),1);saveSaved();showSaved()}else if(b.hasAttribute('data-dup-search')){$('search').value=`${b.dataset.dupSearch||''} duplicate:true`;$('search').dispatchEvent(new Event('input'));closePanel()}else if(b.hasAttribute('data-bulk-select')){
+document.addEventListener('click',async e=>{const b=e.target.closest('[data-intel],[data-cmd],[data-bulk-action],[data-bulk-select],[data-save-search],[data-run-search],[data-delete-search],[data-dup-search],[data-dup-merge],[data-dup-delete],[data-intel-close]');if(!b)return;if(b.matches('[data-intel="command"]'))showCommand();else if(b.dataset.intel==='duplicates'||b.dataset.cmd==='duplicates')showDuplicates();else if(b.dataset.intel==='saved'||b.dataset.cmd==='saved')showSaved();else if(b.dataset.intel==='bulk'||b.dataset.cmd==='bulk')showBulk();else if(b.dataset.cmd==='search'){$('search')?.focus();closePanel()}else if(b.dataset.cmd==='clear'){$('clearSearch')?.click();closePanel()}else if(b.hasAttribute('data-intel-close'))closePanel();else if(b.hasAttribute('data-save-search')){const name=$('savedSearchName')?.value.trim(),query=$('savedSearchQuery')?.value.trim();if(name&&query){state.saved.push({name,query});saveSaved();showSaved()}}else if(b.hasAttribute('data-run-search')){$('search').value=state.saved[Number(b.dataset.runSearch)]?.query||'';$('search').dispatchEvent(new Event('input'));closePanel()}else if(b.hasAttribute('data-delete-search')){state.saved.splice(Number(b.dataset.deleteSearch),1);saveSaved();showSaved()}else if(b.hasAttribute('data-dup-search')){$('search').value=`${b.dataset.dupSearch||''} duplicate:true`;$('search').dispatchEvent(new Event('input'));closePanel()}else if(b.hasAttribute('data-dup-merge'))await resolveDuplicateGroup(Number(b.dataset.dupMerge),false);else if(b.hasAttribute('data-dup-delete'))await resolveDuplicateGroup(Number(b.dataset.dupDelete),true);else if(b.hasAttribute('data-bulk-select')){
     const visible=await visibleLinks();
     if(b.dataset.bulkSelect==='all')visible.forEach(l=>state.selected.add(l.canonicalUrl));
     if(b.dataset.bulkSelect==='clear')state.selected.clear();
